@@ -3,7 +3,13 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.7.34018.315
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ShogiServer.WebApi", "ShogiServer.WebApi\ShogiServer.WebApi.csproj", "{C6F09E6A-A155-4E10-B39E-E321930D7E43}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ShogiServer.WebApi", "ShogiServer.WebApi\ShogiServer.WebApi.csproj", "{C6F09E6A-A155-4E10-B39E-E321930D7E43}"
+EndProject
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ShogiServer.Model", "ShogiServer.Model\ShogiServer.Model.csproj", "{FABBFFF4-EF52-4C65-80EB-2A3FC7D225D4}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ShogiServer.Tests.GameState", "ShogiServer.Tests.GameState\ShogiServer.Tests.GameState.csproj", "{26D1B5ED-2DE0-4B65-8F3B-126A80D7C2FF}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ShogiServer.GameState", "ShogiServer.GameState\ShogiServer.GameState.csproj", "{F746DC0F-4782-4E3E-8752-8C363EFEE503}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -15,6 +21,18 @@ Global
 		{C6F09E6A-A155-4E10-B39E-E321930D7E43}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{C6F09E6A-A155-4E10-B39E-E321930D7E43}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{C6F09E6A-A155-4E10-B39E-E321930D7E43}.Release|Any CPU.Build.0 = Release|Any CPU
+		{FABBFFF4-EF52-4C65-80EB-2A3FC7D225D4}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{FABBFFF4-EF52-4C65-80EB-2A3FC7D225D4}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{FABBFFF4-EF52-4C65-80EB-2A3FC7D225D4}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{FABBFFF4-EF52-4C65-80EB-2A3FC7D225D4}.Release|Any CPU.Build.0 = Release|Any CPU
+		{26D1B5ED-2DE0-4B65-8F3B-126A80D7C2FF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{26D1B5ED-2DE0-4B65-8F3B-126A80D7C2FF}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{26D1B5ED-2DE0-4B65-8F3B-126A80D7C2FF}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{26D1B5ED-2DE0-4B65-8F3B-126A80D7C2FF}.Release|Any CPU.Build.0 = Release|Any CPU
+		{F746DC0F-4782-4E3E-8752-8C363EFEE503}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{F746DC0F-4782-4E3E-8752-8C363EFEE503}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{F746DC0F-4782-4E3E-8752-8C363EFEE503}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{F746DC0F-4782-4E3E-8752-8C363EFEE503}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
