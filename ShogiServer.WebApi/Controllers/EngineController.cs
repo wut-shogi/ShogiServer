@@ -6,5 +6,10 @@ namespace ShogiServer.WebApi.Controllers
     [ApiController]
     public class EngineController : ControllerBase
     {
+        [HttpGet]
+        public async Task<ActionResult> GetBestMove(string boardState)
+        {
+            return Ok(boardState);
+        }
     }
 }

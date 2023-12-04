@@ -6,6 +6,12 @@ namespace ShogiServer.WebApi.Hubs
     public interface IGameClient
     {
         Task SendGameState(Game game);
-        Task SendGameConclusion(Game game);
+        Task SendGameConclusion(GameConclusion gameConclusion);
+    }
+
+    public class GameConclusion
+    {
+        public Game Game { get; set; }
+        public Game.PieceColor Winner { get; set; }
     }
 }
