@@ -1,0 +1,3 @@
+namespace ShogiServer.WebApi.Model
+{
+}
