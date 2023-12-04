@@ -95,8 +95,11 @@ namespace ShogiServer.IntegrationTests.Hubs
             var nickname2 = "player2";
             await connection2.StartAsync();
             await connection2.InvokeAsync(nameof(MatchmakingHub.JoinLobby), nickname2);
-            await connection2.StopAsync();
 
+            await connection2.StopAsync();
+            await connection2.DisposeAsync();
+
+            connection2.State.Should().Be(HubConnectionState.Disconnected);
             result.Should().NotBeNull();
             result?.Count.Should().Be(1);
         }
