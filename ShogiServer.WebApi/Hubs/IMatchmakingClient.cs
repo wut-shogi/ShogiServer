@@ -1,4 +1,5 @@
 ﻿using Microsoft.AspNetCore.Http.HttpResults;
+using ShogiServer.WebApi.Model;
 using SignalRSwaggerGen.Attributes;
 
 namespace ShogiServer.WebApi.Hubs
@@ -6,16 +7,11 @@ namespace ShogiServer.WebApi.Hubs
     [SignalRHub]
     public interface IMatchmakingClient
     {
-        Task SendLobby(Lobby lobby);
-        Task SendCreatedPlayer(CreatedPlayer createdPlayer);
+        Task SendLobby(List<Player> lobby);
+        Task SendAuthenticatedPlayer(AuthenticatedPlayer createdPlayer);
         Task SendInvitation(Invitation invitation);
         Task SendRejection();
         Task SendCreatedGame(Game game);
-    }
-
-    public class CreatedPlayer : Player
-    {
-        public string Token { get; set; }
     }
 
     public record JoinLobbyRequest(string Nickname);
@@ -24,22 +20,11 @@ namespace ShogiServer.WebApi.Hubs
     public record InviteRequest(Guid InvitingPlayerId, Guid InvitedPlayerId);
     public record InviteResponse(Invitation Invitation);
 
-    public class Lobby
-    {
-        public List<Player> Players;
-    }
-
     public class Invitation
     {
         public Guid Id { get; set; }
         public Player InvitingPlayer { get; set; }
         public Player InvitedPlayer { get; set; }
-    }
-
-    public class Player
-    {
-        public Guid Id { get; set; }
-        public string Nickname { get; set; }
     }
 
     public record AcceptInvitationRequest(Guid InvitationId);
