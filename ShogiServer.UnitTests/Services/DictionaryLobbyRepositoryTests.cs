@@ -1,7 +1,7 @@
 ﻿using ShogiServer.WebApi.Model;
-using ShogiServer.WebApi.Repositories;
+using ShogiServer.WebApi.Services;
 
-namespace ShogiServer.UnitTests.Repositories
+namespace ShogiServer.UnitTests.Services
 {
     internal class DictionaryLobbyRepositoryTests
     {

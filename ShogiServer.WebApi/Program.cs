@@ -1,5 +1,5 @@
 using ShogiServer.WebApi.Hubs;
-using ShogiServer.WebApi.Repositories;
+using ShogiServer.WebApi.Services;
 using System.Text.Json.Serialization;
 namespace ShogiServer.WebApi
 {

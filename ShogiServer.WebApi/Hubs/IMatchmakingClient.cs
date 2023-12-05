@@ -14,19 +14,6 @@ namespace ShogiServer.WebApi.Hubs
         Task SendCreatedGame(Game game);
     }
 
-    public record JoinLobbyRequest(string Nickname);
-    public record JoinLobbyResponse(Player Player);
-
-    public record InviteRequest(Guid InvitingPlayerId, Guid InvitedPlayerId);
-    public record InviteResponse(Invitation Invitation);
-
-    public class Invitation
-    {
-        public Guid Id { get; set; }
-        public Player InvitingPlayer { get; set; }
-        public Player InvitedPlayer { get; set; }
-    }
-
     public record AcceptInvitationRequest(Guid InvitationId);
     public record AcceptInvitationResponse(Game Game);
 
@@ -46,6 +33,5 @@ namespace ShogiServer.WebApi.Hubs
         public string UsiBoardState { get; set; }
     }
 
-    public record RejectInvitationRequest(Guid InvitationId);
     public record RejectInvitationResponse();
 }

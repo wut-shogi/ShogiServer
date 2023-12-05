@@ -1,7 +1,7 @@
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.Extensions.DependencyInjection;
 using ShogiServer.WebApi;
-using ShogiServer.WebApi.Repositories;
+using ShogiServer.WebApi.Services;
 
 namespace ShogiServer.IntegrationTests
 {

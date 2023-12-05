@@ -1,12 +1,20 @@
 ﻿using ShogiServer.WebApi.Model;
 using System.Linq;
 
-namespace ShogiServer.WebApi.Repositories
+namespace ShogiServer.WebApi.Services
 {
+    /// <summary>
+    /// ILobbyRepository implementation. Uses dictionary as inner data container.
+    /// As it is an in-memory container, data is not saved between applications runs.
+    /// </summary>
     public class DictionaryLobbyRepository : ILobbyRepository
     {
         private readonly object _lock = new();
 
+        /// <summary>
+        /// Wrapper for dictionary of AuthenticatedPlayer with two keys,
+        /// which are ConnectionId and Nickname.
+        /// </summary>
         private class AuthenticatedPlayersStore
         {
             private readonly Dictionary<string, AuthenticatedPlayer> _nicknameToPlayers = new();
@@ -74,6 +82,8 @@ namespace ShogiServer.WebApi.Repositories
 
         private readonly AuthenticatedPlayersStore _lobby = new();
 
+        private readonly Dictionary<Guid, Invitation> _invitations = new();
+
         public bool Join(AuthenticatedPlayer player)
         {
             lock (_lock)
@@ -96,9 +106,52 @@ namespace ShogiServer.WebApi.Repositories
 
         public void Leave(string connectionId)
         {
-            lock(_lock)
+            lock (_lock)
             {
                 _lobby.RemoveByConnection(connectionId);
+            }
+        }
+
+        public Player? GetPlayer(string nickname)
+        {
+            lock (_lock)
+            {
+                return _lobby.GetByNickname(nickname)?.ToPlayer();
+            }
+        }
+
+        public AuthenticatedPlayer? GetAuthenticatedPlayer(string connectionId, string token)
+        {
+            lock (_lock)
+            {
+                var player = _lobby.GetByConnection(connectionId);
+                return player?.Token == token ? player : null;
+            }
+        }
+
+        public Invitation? Invite(string invitingConnection, string invitedNickname)
+        {
+            lock (_lock)
+            {
+                var inviting = _lobby.GetByConnection(invitingConnection);
+                var invited = _lobby.GetByNickname(invitedNickname);
+
+                if (invited?.State != PlayerState.Ready || inviting?.State != PlayerState.Ready)
+                {
+                    return null;
+                }
+
+                inviting.State = PlayerState.Inviting;
+                invited.State = PlayerState.Invited;
+
+                var invitation = new Invitation
+                {
+                    InvitingPlayer = inviting.ToPlayer(),
+                    InvitedPlayer = invited.ToPlayer(),
+                };
+
+                _invitations.Add(invitation.Id, invitation);
+                return invitation;
             }
         }
     }
