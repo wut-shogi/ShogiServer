@@ -44,16 +44,28 @@ namespace ShogiServer.WebApi.Services
         /// Create invitation and lock players' state.
         /// </summary>
         /// <param name="invitingConnection"></param>
-        /// <param name="invitedConnection"></param>
+        /// <param name="invitedNickname"></param>
         /// <returns>Created invitation or null, if operation failed</returns>
-        Invitation? Invite(string invitingConnection, string InvitedNickname);
+        Invitation? CreateInvitation(string invitingConnection, string invitedNickname);
 
         /// <summary>
-        /// Create invitation and lock players' state.
+        /// Get invitation by id.
         /// </summary>
-        /// <param name="invitingConnection"></param>
-        /// <param name="invitedConnection"></param>
-        /// <returns>Created invitation or null, if operation failed</returns>
-        //void CancelInvite(string invitingConnection, string InvitedNickname);
+        /// <param name="invitationId"></param>
+        /// <returns>Invitation or null, if operation failed</returns>
+        Invitation? GetInvitation(Guid invitationId);
+
+        /// <summary>
+        /// Remove invitation and unlock players' state.
+        /// </summary>
+        /// <param name="invitationId"></param>
+        void RemoveInvitation(Guid invitationId);
+
+        /// <summary>
+        /// Accept invitation, create game and removeplayers from lobby.
+        /// </summary>
+        /// <param name="invitationId"></param>
+        /// <returns>Created game or null, if operation failed</returns>
+        void AcceptInvitation(Guid invitationId);
     }
 }

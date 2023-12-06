@@ -129,7 +129,7 @@ namespace ShogiServer.WebApi.Services
             }
         }
 
-        public Invitation? Invite(string invitingConnection, string invitedNickname)
+        public Invitation? CreateInvitation(string invitingConnection, string invitedNickname)
         {
             lock (_lock)
             {
@@ -153,6 +153,42 @@ namespace ShogiServer.WebApi.Services
                 _invitations.Add(invitation.Id, invitation);
                 return invitation;
             }
+        }
+
+        public Invitation? GetInvitation(Guid invitationId)
+        {
+            lock (_lock)
+            {
+                return _invitations.ContainsKey(invitationId) ? _invitations[invitationId] : null;
+            }
+        }
+
+        public void RemoveInvitation(Guid invitationId)
+        {
+            lock (_lock)
+            {
+                if (!_invitations.ContainsKey(invitationId)) return;
+
+                var invitation = _invitations[invitationId];
+                _invitations.Remove(invitationId);
+
+                var player = _lobby.GetByConnection(invitation.InvitingPlayer.ConnectionId);
+                if (player != null)
+                {
+                    player.State = PlayerState.Ready;
+                }
+                
+                player = _lobby.GetByConnection(invitation.InvitedPlayer.ConnectionId);
+                if (player != null)
+                {
+                    player.State = PlayerState.Ready;
+                }
+            }
+        }
+
+        public void AcceptInvitation(Guid invitationId)
+        {
+            throw new NotImplementedException();
         }
     }
 }

@@ -47,7 +47,7 @@ namespace ShogiServer.WebApi.Hubs
         {
             AuthenticateOrThrow(request.Token);
 
-            var invite = _lobby.Invite(Context.ConnectionId, request.InvitedNickname) ??
+            var invite = _lobby.CreateInvitation(Context.ConnectionId, request.InvitedNickname) ??
                 throw new HubException("Could not send invite.");
 
             await Clients.Client(invite.InvitedPlayer.ConnectionId).SendInvitation(invite);
@@ -62,8 +62,16 @@ namespace ShogiServer.WebApi.Hubs
         {
             AuthenticateOrThrow(request.Token);
 
+            var invite = _lobby.GetInvitation(request.InvitationId) ?? 
+                throw new HubException("Invitation does not exist.");
+
+            if (invite?.InvitedPlayer.ConnectionId != Context.ConnectionId)
+            {
+                throw new HubException("Invitation not targeted to this player.");
+            }
             
 
+            await Clients.Client(invite.InvitingPlayer.ConnectionId).SendRejection();
             await Clients.All.SendLobby(_lobby.GetLobby());
         }
 
