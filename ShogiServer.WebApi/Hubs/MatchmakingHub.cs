@@ -7,82 +7,235 @@ namespace ShogiServer.WebApi.Hubs
 {
     public record InviteRequest(string InvitedNickname, string Token);
     public record RejectInvitationRequest(Guid InvitationId, string Token);
+    public record CancelInvitationRequest(Guid InvitationId, string Token);
+    public record AcceptInvitationRequest(Guid InvitationId, string Token);
 
     [SignalRHub]
     public class MatchmakingHub : Hub<IMatchmakingClient>
     {
-        private readonly ILobbyRepository _lobby;
+        private readonly IRepositoryWrapper _repositories;
 
-        public MatchmakingHub(ILobbyRepository lobby)
+
+        public MatchmakingHub(IRepositoryWrapper repositories)
         {
-            _lobby = lobby;
-        }
-        
-        private void AuthenticateOrThrow(string token)
-        {
-            _ = _lobby.GetAuthenticatedPlayer(Context.ConnectionId, token) ??
-                throw new HubException("Could not authenticate request.");
+            _repositories = repositories;
         }
 
         public async Task JoinLobby(string nickname)
         {
-            var newPlayer = new AuthenticatedPlayer
+            var newPlayer = new Player
             {
+                Id = Guid.NewGuid(),
                 Nickname = nickname,
-                ConnectionId = Context.ConnectionId
+                ConnectionId = Context.ConnectionId,
+                Token = Guid.NewGuid().ToString(),
+                State = PlayerState.Ready,
             };
 
-            if (_lobby.Join(newPlayer))
+            try
             {
-                await Clients.Caller.SendAuthenticatedPlayer(newPlayer);
-                await Clients.All.SendLobby(_lobby.GetLobby());
+                _repositories.Players.Create(newPlayer);
+                _repositories.Save();
+
+                await Clients.Caller.SendPlayer(newPlayer);
+                await Clients.All.SendLobby(AnonymousLobby());
             }
-            else
+            catch (Exception ex)
             {
-                throw new HubException("Could not join lobby.");
+                throw new HubException(ex.Message);
             }
+        }
+
+        private static Player Anonymize(Player player)
+        {
+            player.Token = null!;
+            return player;
+        }
+
+        private List<Player> AnonymousLobby()
+        {
+            return _repositories
+                .Players
+                .FindAll()
+                .Select(Anonymize)
+                .ToList();
+        }
+
+        private Player AuthenticatedPlayer(string token)
+        {
+            return _repositories
+                .Players
+                .FindByCondition(p => p.ConnectionId == Context.ConnectionId && p.Token == token)
+                .FirstOrDefault() ??
+                throw new HubException("Could not authenticate");
         }
 
         public async Task Invite(InviteRequest request)
         {
-            AuthenticateOrThrow(request.Token);
+            var transaction = _repositories.BeginTransaction()!;
+            try
+            {
+                var player = AuthenticatedPlayer(request.Token);
 
-            var invite = _lobby.CreateInvitation(Context.ConnectionId, request.InvitedNickname) ??
-                throw new HubException("Could not send invite.");
+                var invitedPlayer = _repositories
+                    .Players
+                    .FindByCondition(p => p.Nickname == request.InvitedNickname)
+                    .FirstOrDefault() ??
+                    throw new HubException("There is no player with given nickname");
 
-            await Clients.Client(invite.InvitedPlayer.ConnectionId).SendInvitation(invite);
-            await Clients.All.SendLobby(_lobby.GetLobby());
+                if (player.State != PlayerState.Ready || invitedPlayer.State != PlayerState.Ready)
+                {
+                    throw new HubException("Players are not eligible for invite");
+                }
+
+                var invite = new Invitation
+                {
+                    Id = Guid.NewGuid(),
+                    InvitedPlayerId = invitedPlayer.Id,
+                    InvitingPlayerId = player.Id
+                };
+                _repositories.Invitations.Create(invite);
+
+                player.SentInvitation = invite;
+                player.State = PlayerState.Inviting;
+                _repositories.Players.Update(player);
+
+                invitedPlayer.ReceivedInvitation = invite;
+                invitedPlayer.State = PlayerState.Inviting;
+                _repositories.Players.Update(invitedPlayer);
+
+                transaction.Commit();
+                _repositories.Save();
+
+                invite.InvitedPlayer = Anonymize(invite.InvitedPlayer);
+                invite.InvitedPlayer.ReceivedInvitation = null;
+                invite.InvitingPlayer.SentInvitation = null;
+
+                await Clients.Client(invitedPlayer.ConnectionId).SendInvitation(invite);
+                await Clients.All.SendLobby(AnonymousLobby());
+            }
+            catch (Exception)
+            {
+                transaction.Rollback();
+                throw;
+            }
         }
 
         public async Task AcceptInvitation(AcceptInvitationRequest request)
         {
+            var transaction = _repositories.BeginTransaction()!;
+            try
+            {
+                var player = AuthenticatedPlayer(request.Token);
+                var invite = _repositories.Invitations.GetById(request.InvitationId) ??
+                    throw new HubException("Invitation does not exist.");
+
+                if (invite.InvitedPlayerId != player.Id)
+                {
+                    throw new HubException("Invitation not targeted to this player.");
+                }
+
+                _repositories.Invitations.Delete(invite);
+
+                var invitingPlayer = _repositories.Players.GetById(invite.InvitingPlayerId) ??
+                    throw new HubException("Inviting player does not exist.");
+
+                var newGame = new Game
+                {
+                    Id = Guid.NewGuid(),
+                    BlackId = invitingPlayer.Id,
+                    WhiteId = player.Id,
+                    BoardState = "TODO"
+                };
+
+                _repositories.Games.Create(newGame);
+
+                invitingPlayer.SentInvitation = null;
+                invitingPlayer.GameAsBlack = newGame;
+                invitingPlayer.State = PlayerState.Playing;
+                _repositories.Players.Update(invitingPlayer);
+
+                player.ReceivedInvitation = null;
+                invitingPlayer.GameAsWhite = newGame;
+                player.State = PlayerState.Playing;
+                _repositories.Players.Update(player);
+
+                transaction.Commit();
+                _repositories.Save();
+
+                newGame.White = null!;
+                newGame.Black = null!;
+
+                await Clients.Client(invitingPlayer.ConnectionId).SendCreatedGame(newGame);
+                await Clients.Client(player.ConnectionId).SendCreatedGame(newGame);
+                await Clients.All.SendLobby(AnonymousLobby());
+            }
+            catch (Exception)
+            {
+                transaction.Rollback();
+                throw;
+            }
         }
 
         public async Task RejectInvitation(RejectInvitationRequest request)
         {
-            AuthenticateOrThrow(request.Token);
-
-            var invite = _lobby.GetInvitation(request.InvitationId) ?? 
-                throw new HubException("Invitation does not exist.");
-
-            if (invite?.InvitedPlayer.ConnectionId != Context.ConnectionId)
+            var transaction = _repositories.BeginTransaction()!;
+            try
             {
-                throw new HubException("Invitation not targeted to this player.");
+                var player = AuthenticatedPlayer(request.Token);
+                var invite = _repositories.Invitations.GetById(request.InvitationId) ??
+                    throw new HubException("Invitation does not exist.");
+
+                if (invite.InvitedPlayerId != player.Id)
+                {
+                    throw new HubException("Invitation not targeted to this player.");
+                }
+
+                _repositories.Invitations.Delete(invite);
+
+                var invitingPlayer = _repositories.Players.GetById(invite.InvitingPlayerId) ??
+                    throw new HubException("Inviting player does not exist.");
+
+                invitingPlayer.SentInvitation = null;
+                invitingPlayer.State = PlayerState.Ready;
+                _repositories.Players.Update(invitingPlayer);
+
+                player.ReceivedInvitation = null;
+                player.State = PlayerState.Ready;
+                _repositories.Players.Update(player);
+
+                transaction.Commit();
+                _repositories.Save();
+
+                await Clients.Client(invitingPlayer.ConnectionId).SendRejection();
+                await Clients.All.SendLobby(AnonymousLobby());
             }
-            
-
-            await Clients.Client(invite.InvitingPlayer.ConnectionId).SendRejection();
-            await Clients.All.SendLobby(_lobby.GetLobby());
-        }
-
-        public async Task CancelInvitation(AcceptInvitationRequest request)
-        {
+            catch (Exception)
+            {
+                transaction.Rollback();
+                throw;
+            }
         }
 
         public override async Task OnDisconnectedAsync(Exception? exception)
         {
-            _lobby.Leave(Context.ConnectionId);
-            await Clients.All.SendLobby(_lobby.GetLobby());
+            // TODO - delete invitation
+            try
+            {
+                var player = _repositories
+                    .Players
+                    .FindByCondition(p => p.ConnectionId == Context.ConnectionId)
+                    .First();
+                _repositories.Players.Delete(player);
+                _repositories.Save();
+
+                await Clients.All.SendLobby(AnonymousLobby());
+            }
+            catch (Exception ex)
+            {
+                throw new HubException(ex.Message);
+            }
+
             await base.OnDisconnectedAsync(exception);
         }
     }

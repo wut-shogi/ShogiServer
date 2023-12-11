@@ -1,4 +1,5 @@
-﻿using SignalRSwaggerGen.Attributes;
+﻿using ShogiServer.WebApi.Model;
+using SignalRSwaggerGen.Attributes;
 
 namespace ShogiServer.WebApi.Hubs
 {
@@ -12,6 +13,5 @@ namespace ShogiServer.WebApi.Hubs
     public class GameConclusion
     {
         public Game Game { get; set; }
-        public Game.PieceColor Winner { get; set; }
     }
 }

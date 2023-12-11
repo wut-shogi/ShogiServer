@@ -16,6 +16,7 @@ namespace ShogiServer.IntegrationTests.Hubs
         private HubConnection connection2 = null!;
         private HubConnection connection3 = null!;
 
+
         [SetUp]
         public void Setup()
         {
@@ -26,18 +27,21 @@ namespace ShogiServer.IntegrationTests.Hubs
                 .WithUrl(
                     "http://localhost/matchmaking",
                     o => o.HttpMessageHandlerFactory = _ => server.CreateHandler())
+                .WithAutomaticReconnect()
                 .Build();
 
             connection2 = new HubConnectionBuilder()
                 .WithUrl(
                     "http://localhost/matchmaking",
                     o => o.HttpMessageHandlerFactory = _ => server.CreateHandler())
+                .WithAutomaticReconnect()
                 .Build();
 
             connection3 = new HubConnectionBuilder()
                 .WithUrl(
                     "http://localhost/matchmaking",
                     o => o.HttpMessageHandlerFactory = _ => server.CreateHandler())
+                .WithAutomaticReconnect()
                 .Build();
         }
 
@@ -52,8 +56,8 @@ namespace ShogiServer.IntegrationTests.Hubs
         public async Task JoinLobby_CreatesPlayer()
         {
             var nickname = "player1";
-            AuthenticatedPlayer? result = null;
-            connection1.On<AuthenticatedPlayer>(nameof(IMatchmakingClient.SendAuthenticatedPlayer), response =>
+            Player? result = null;
+            connection1.On<Player>(nameof(IMatchmakingClient.SendPlayer), response =>
             {
                 result = response;
             });
@@ -125,13 +129,12 @@ namespace ShogiServer.IntegrationTests.Hubs
             {
                 result = response;
             });
-
             await connection1.StartAsync();
             await connection1.InvokeAsync(nameof(MatchmakingHub.JoinLobby), nickname1);
 
             var nickname2 = "player2";
-            AuthenticatedPlayer? player2 = null;
-            connection2.On<AuthenticatedPlayer>(nameof(IMatchmakingClient.SendAuthenticatedPlayer), response =>
+            Player? player2 = null;
+            connection2.On<Player>(nameof(IMatchmakingClient.SendPlayer), response =>
             {
                 player2 = response;
             });
@@ -153,8 +156,8 @@ namespace ShogiServer.IntegrationTests.Hubs
             var nickname1 = "player1";
 
             var nickname2 = "player2";
-            AuthenticatedPlayer? player2 = null;
-            connection2.On<AuthenticatedPlayer>(nameof(IMatchmakingClient.SendAuthenticatedPlayer), response =>
+            Player? player2 = null;
+            connection2.On<Player>(nameof(IMatchmakingClient.SendPlayer), response =>
             {
                 player2 = response;
             });
@@ -164,15 +167,15 @@ namespace ShogiServer.IntegrationTests.Hubs
 
             var act = async () => await connection2.InvokeAsync(nameof(MatchmakingHub.Invite), new InviteRequest(nickname1, player2!.Token));
 
-            await act.Should().ThrowAsync<HubException>().Where(ex => ex.Message.Contains("invite"));
+            await act.Should().ThrowAsync<HubException>().Where(ex => ex.Message.Contains("nickname"));
         }
 
         [Test]
         public async Task Invite_WhenPlayerBeingInvited_ThrowsError()
         {
             var nickname1 = "player1";
-            AuthenticatedPlayer? player1 = null;
-            connection1.On<AuthenticatedPlayer>(nameof(IMatchmakingClient.SendAuthenticatedPlayer), response =>
+            Player? player1 = null;
+            connection1.On<Player>(nameof(IMatchmakingClient.SendPlayer), response =>
             {
                 player1 = response;
             });
@@ -185,8 +188,8 @@ namespace ShogiServer.IntegrationTests.Hubs
             await connection2.InvokeAsync(nameof(MatchmakingHub.JoinLobby), nickname2);
 
             var nickname3 = "player3";
-            AuthenticatedPlayer? player3 = null;
-            connection3.On<AuthenticatedPlayer>(nameof(IMatchmakingClient.SendAuthenticatedPlayer), response =>
+            Player? player3 = null;
+            connection3.On<Player>(nameof(IMatchmakingClient.SendPlayer), response =>
             {
                 player3 = response;
             });
@@ -212,8 +215,8 @@ namespace ShogiServer.IntegrationTests.Hubs
         {
             // arrange
             var nickname1 = "player1";
-            AuthenticatedPlayer? player1 = null;
-            connection1.On<AuthenticatedPlayer>(nameof(IMatchmakingClient.SendAuthenticatedPlayer), response =>
+            Player? player1 = null;
+            connection1.On<Player>(nameof(IMatchmakingClient.SendPlayer), response =>
             {
                 player1 = response;
             });
@@ -227,8 +230,8 @@ namespace ShogiServer.IntegrationTests.Hubs
             await connection1.InvokeAsync(nameof(MatchmakingHub.JoinLobby), nickname1);
 
             var nickname2 = "player2";
-            AuthenticatedPlayer? player2 = null;
-            connection2.On<AuthenticatedPlayer>(nameof(IMatchmakingClient.SendAuthenticatedPlayer), response =>
+            Player? player2 = null;
+            connection2.On<Player>(nameof(IMatchmakingClient.SendPlayer), response =>
             {
                 player2 = response;
             });
@@ -257,68 +260,144 @@ namespace ShogiServer.IntegrationTests.Hubs
         }
 
         [Test]
-        [Ignore("Not implemented")]
         public async Task RejectInvitation_WhenRejectingNonxistentInvitation_ThrowsError()
         {
+            // arrange
             var nickname1 = "player1";
-            Invitation? result = null;
+            Player? player1 = null;
+            connection1.On<Player>(nameof(IMatchmakingClient.SendPlayer), response =>
+            {
+                player1 = response;
+            });
+            Invitation? invite = null;
             connection1.On<Invitation>(nameof(IMatchmakingClient.SendInvitation), response =>
             {
-                result = response;
+                invite = response;
             });
 
             await connection1.StartAsync();
             await connection1.InvokeAsync(nameof(MatchmakingHub.JoinLobby), nickname1);
 
             var nickname2 = "player2";
-            AuthenticatedPlayer? player2 = null;
-            connection2.On<AuthenticatedPlayer>(nameof(IMatchmakingClient.SendAuthenticatedPlayer), response =>
+            Player? player2 = null;
+            connection2.On<Player>(nameof(IMatchmakingClient.SendPlayer), response =>
             {
                 player2 = response;
             });
+
             await connection2.StartAsync();
             await connection2.InvokeAsync(nameof(MatchmakingHub.JoinLobby), nickname2);
             await Task.Delay(2000);
 
             await connection2.InvokeAsync(nameof(MatchmakingHub.Invite), new InviteRequest(nickname1, player2!.Token));
-
             await Task.Delay(2000);
-            result.Should().NotBeNull();
-            result?.InvitedPlayer.Nickname.Should().Be(nickname1);
-            result?.InvitingPlayer.Nickname.Should().Be(nickname2);
+
+            var nonExistentInviteId = Guid.NewGuid();
+
+            // act
+            var act = async () => await connection1.InvokeAsync(
+                nameof(MatchmakingHub.RejectInvitation), 
+                new RejectInvitationRequest(nonExistentInviteId, player1!.Token)
+            );
+            await Task.Delay(2000);
+
+            // assert
+            await act.Should().ThrowAsync<HubException>().Where(ex => ex.Message.Contains("exist"));
         }
 
         [Test]
-        [Ignore("Not implemented")]
         public async Task RejectInvitation_WhenRejectingNotOwnedInvitation_ThrowsError()
         {
+            // arrange
             var nickname1 = "player1";
-            Invitation? result = null;
+            Player? player1 = null;
+            connection1.On<Player>(nameof(IMatchmakingClient.SendPlayer), response =>
+            {
+                player1 = response;
+            });
+            Invitation? invite = null;
             connection1.On<Invitation>(nameof(IMatchmakingClient.SendInvitation), response =>
             {
-                result = response;
+                invite = response;
             });
 
             await connection1.StartAsync();
             await connection1.InvokeAsync(nameof(MatchmakingHub.JoinLobby), nickname1);
 
             var nickname2 = "player2";
-            AuthenticatedPlayer? player2 = null;
-            connection2.On<AuthenticatedPlayer>(nameof(IMatchmakingClient.SendAuthenticatedPlayer), response =>
+            Player? player2 = null;
+            connection2.On<Player>(nameof(IMatchmakingClient.SendPlayer), response =>
             {
                 player2 = response;
+            });
+
+            await connection2.StartAsync();
+            await connection2.InvokeAsync(nameof(MatchmakingHub.JoinLobby), nickname2);
+            await Task.Delay(2000);
+
+            await connection2.InvokeAsync(nameof(MatchmakingHub.Invite), new InviteRequest(nickname1, player2!.Token));
+            await Task.Delay(2000);
+
+            // act
+            var act = async () => await connection2.InvokeAsync(
+                nameof(MatchmakingHub.RejectInvitation), 
+                new RejectInvitationRequest(invite!.Id, player2.Token)
+            );
+            await Task.Delay(2000);
+
+            // assert
+            await act.Should().ThrowAsync<HubException>().Where(ex => ex.Message.Contains("targeted"));
+        }
+
+        [Test]
+        public async Task AcceptInvitation_WhenPlayersReady_CreatesGame()
+        {
+            var nickname1 = "player1";
+            Player? player1 = null;
+            connection1.On<Player>(nameof(IMatchmakingClient.SendPlayer), response =>
+            {
+                player1 = response;
+            });
+            Invitation? invitation = null;
+            connection1.On<Invitation>(nameof(IMatchmakingClient.SendInvitation), response =>
+            {
+                invitation = response;
+            });
+            Game? game1 = null;
+            connection1.On<Game>(nameof(IMatchmakingClient.SendCreatedGame), response =>
+            {
+                game1 = response;
+            });
+            await connection1.StartAsync();
+            await connection1.InvokeAsync(nameof(MatchmakingHub.JoinLobby), nickname1);
+
+            var nickname2 = "player2";
+            Player? player2 = null;
+            connection2.On<Player>(nameof(IMatchmakingClient.SendPlayer), response =>
+            {
+                player2 = response;
+            });
+            Game? game2 = null;
+            connection2.On<Game>(nameof(IMatchmakingClient.SendCreatedGame), response =>
+            {
+                game2 = response;
             });
             await connection2.StartAsync();
             await connection2.InvokeAsync(nameof(MatchmakingHub.JoinLobby), nickname2);
             await Task.Delay(2000);
 
             await connection2.InvokeAsync(nameof(MatchmakingHub.Invite), new InviteRequest(nickname1, player2!.Token));
-
             await Task.Delay(2000);
-            result.Should().NotBeNull();
-            result?.InvitedPlayer.Nickname.Should().Be(nickname1);
-            result?.InvitingPlayer.Nickname.Should().Be(nickname2);
-        }
 
+            await connection1.InvokeAsync(
+                nameof(MatchmakingHub.AcceptInvitation),
+                new AcceptInvitationRequest(invitation!.Id, player1!.Token)
+            );
+            await Task.Delay(2000);
+
+            game1.Should().NotBeNull();
+            game2.Should().NotBeNull();
+            game1!.Id.Should().Be(game2!.Id);
+        }
     }
 }

@@ -9,11 +9,13 @@ namespace ShogiServer.IntegrationTests
     internal class StartupTests
     {
         private WebApplicationFactory<Program> application = null!;
+        private IServiceScope scope = null!;
 
         [SetUp]
         public void Setup()
         {
             application = new WebApplicationFactory<Program>();
+            scope = application.Services.CreateScope();
         }
 
         [Test]
@@ -23,9 +25,9 @@ namespace ShogiServer.IntegrationTests
         }
 
         [Test]
-        public void ILobbyRepository_Exists()
+        public void IRepositoryWrapper_Exists()
         {
-            application.Services.GetService<ILobbyRepository>().Should().NotBeNull();
+            scope.ServiceProvider.GetRequiredService<IRepositoryWrapper>().Should().NotBeNull();
         }
     }
 }
