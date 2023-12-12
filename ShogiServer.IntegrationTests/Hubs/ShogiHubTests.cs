@@ -8,7 +8,7 @@ using ShogiServer.WebApi.Model;
 
 namespace ShogiServer.IntegrationTests.Hubs
 {
-    internal class MatchmakingHubTests
+    internal class ShogiHubTests
     {
         private WebApplicationFactory<Program> application = null!;
         private TestServer server = null!;
@@ -25,21 +25,21 @@ namespace ShogiServer.IntegrationTests.Hubs
 
             connection1 = new HubConnectionBuilder()
                 .WithUrl(
-                    "http://localhost/matchmaking",
+                    "http://localhost/shogi-hub",
                     o => o.HttpMessageHandlerFactory = _ => server.CreateHandler())
                 .WithAutomaticReconnect()
                 .Build();
 
             connection2 = new HubConnectionBuilder()
                 .WithUrl(
-                    "http://localhost/matchmaking",
+                    "http://localhost/shogi-hub",
                     o => o.HttpMessageHandlerFactory = _ => server.CreateHandler())
                 .WithAutomaticReconnect()
                 .Build();
 
             connection3 = new HubConnectionBuilder()
                 .WithUrl(
-                    "http://localhost/matchmaking",
+                    "http://localhost/shogi-hub",
                     o => o.HttpMessageHandlerFactory = _ => server.CreateHandler())
                 .WithAutomaticReconnect()
                 .Build();
@@ -57,13 +57,13 @@ namespace ShogiServer.IntegrationTests.Hubs
         {
             var nickname = "player1";
             Player? result = null;
-            connection1.On<Player>(nameof(IMatchmakingClient.SendPlayer), response =>
+            connection1.On<Player>(nameof(IShogiClient.SendPlayer), response =>
             {
                 result = response;
             });
             await connection1.StartAsync();
 
-            await connection1.InvokeAsync(nameof(MatchmakingHub.JoinLobby), nickname);
+            await connection1.InvokeAsync(nameof(ShogiHub.JoinLobby), nickname);
 
             await Task.Delay(2000);
             result.Should().NotBeNull();
@@ -76,17 +76,17 @@ namespace ShogiServer.IntegrationTests.Hubs
         {
             var nickname1 = "player1";
             List<Player>? result = null;
-            connection1.On<List<Player>>(nameof(IMatchmakingClient.SendLobby), response =>
+            connection1.On<List<Player>>(nameof(IShogiClient.SendLobby), response =>
             {
                 result = response;
             });
 
             await connection1.StartAsync();
-            await connection1.InvokeAsync(nameof(MatchmakingHub.JoinLobby), nickname1);
+            await connection1.InvokeAsync(nameof(ShogiHub.JoinLobby), nickname1);
 
             var nickname2 = "player2";
             await connection2.StartAsync();
-            await connection2.InvokeAsync(nameof(MatchmakingHub.JoinLobby), nickname2);
+            await connection2.InvokeAsync(nameof(ShogiHub.JoinLobby), nickname2);
 
             await Task.Delay(2000);
             result.Should().NotBeNull();
@@ -98,17 +98,17 @@ namespace ShogiServer.IntegrationTests.Hubs
         {
             var nickname1 = "player1";
             List<Player>? result = null;
-            connection1.On<List<Player>>(nameof(IMatchmakingClient.SendLobby), response =>
+            connection1.On<List<Player>>(nameof(IShogiClient.SendLobby), response =>
             {
                 result = response;
             });
 
             await connection1.StartAsync();
-            await connection1.InvokeAsync(nameof(MatchmakingHub.JoinLobby), nickname1);
+            await connection1.InvokeAsync(nameof(ShogiHub.JoinLobby), nickname1);
 
             var nickname2 = "player2";
             await connection2.StartAsync();
-            await connection2.InvokeAsync(nameof(MatchmakingHub.JoinLobby), nickname2);
+            await connection2.InvokeAsync(nameof(ShogiHub.JoinLobby), nickname2);
 
             await connection2.StopAsync();
             await connection2.DisposeAsync();
@@ -125,24 +125,24 @@ namespace ShogiServer.IntegrationTests.Hubs
         {
             var nickname1 = "player1";
             Invitation? result = null;
-            connection1.On<Invitation>(nameof(IMatchmakingClient.SendInvitation), response =>
+            connection1.On<Invitation>(nameof(IShogiClient.SendInvitation), response =>
             {
                 result = response;
             });
             await connection1.StartAsync();
-            await connection1.InvokeAsync(nameof(MatchmakingHub.JoinLobby), nickname1);
+            await connection1.InvokeAsync(nameof(ShogiHub.JoinLobby), nickname1);
 
             var nickname2 = "player2";
             Player? player2 = null;
-            connection2.On<Player>(nameof(IMatchmakingClient.SendPlayer), response =>
+            connection2.On<Player>(nameof(IShogiClient.SendPlayer), response =>
             {
                 player2 = response;
             });
             await connection2.StartAsync();
-            await connection2.InvokeAsync(nameof(MatchmakingHub.JoinLobby), nickname2);
+            await connection2.InvokeAsync(nameof(ShogiHub.JoinLobby), nickname2);
             await Task.Delay(2000);
 
-            await connection2.InvokeAsync(nameof(MatchmakingHub.Invite), new InviteRequest(nickname1, player2!.Token));
+            await connection2.InvokeAsync(nameof(ShogiHub.Invite), new InviteRequest(nickname1, player2!.Token));
 
             await Task.Delay(2000);
             result.Should().NotBeNull();
@@ -157,15 +157,15 @@ namespace ShogiServer.IntegrationTests.Hubs
 
             var nickname2 = "player2";
             Player? player2 = null;
-            connection2.On<Player>(nameof(IMatchmakingClient.SendPlayer), response =>
+            connection2.On<Player>(nameof(IShogiClient.SendPlayer), response =>
             {
                 player2 = response;
             });
             await connection2.StartAsync();
-            await connection2.InvokeAsync(nameof(MatchmakingHub.JoinLobby), nickname2);
+            await connection2.InvokeAsync(nameof(ShogiHub.JoinLobby), nickname2);
             await Task.Delay(2000);
 
-            var act = async () => await connection2.InvokeAsync(nameof(MatchmakingHub.Invite), new InviteRequest(nickname1, player2!.Token));
+            var act = async () => await connection2.InvokeAsync(nameof(ShogiHub.Invite), new InviteRequest(nickname1, player2!.Token));
 
             await act.Should().ThrowAsync<HubException>().Where(ex => ex.Message.Contains("nickname"));
         }
@@ -175,35 +175,35 @@ namespace ShogiServer.IntegrationTests.Hubs
         {
             var nickname1 = "player1";
             Player? player1 = null;
-            connection1.On<Player>(nameof(IMatchmakingClient.SendPlayer), response =>
+            connection1.On<Player>(nameof(IShogiClient.SendPlayer), response =>
             {
                 player1 = response;
             });
             await connection1.StartAsync();
-            await connection1.InvokeAsync(nameof(MatchmakingHub.JoinLobby), nickname1);
+            await connection1.InvokeAsync(nameof(ShogiHub.JoinLobby), nickname1);
             await Task.Delay(2000);
 
             var nickname2 = "player2";
             await connection2.StartAsync();
-            await connection2.InvokeAsync(nameof(MatchmakingHub.JoinLobby), nickname2);
+            await connection2.InvokeAsync(nameof(ShogiHub.JoinLobby), nickname2);
 
             var nickname3 = "player3";
             Player? player3 = null;
-            connection3.On<Player>(nameof(IMatchmakingClient.SendPlayer), response =>
+            connection3.On<Player>(nameof(IShogiClient.SendPlayer), response =>
             {
                 player3 = response;
             });
             await connection3.StartAsync();
-            await connection3.InvokeAsync(nameof(MatchmakingHub.JoinLobby), nickname3);
+            await connection3.InvokeAsync(nameof(ShogiHub.JoinLobby), nickname3);
             await Task.Delay(2000);
 
             await connection1.InvokeAsync(
-                nameof(MatchmakingHub.Invite),
+                nameof(ShogiHub.Invite),
                 new InviteRequest(nickname2, player1!.Token)
             );
 
             var act = async () => await connection3.InvokeAsync(
-                nameof(MatchmakingHub.Invite),
+                nameof(ShogiHub.Invite),
                 new InviteRequest(nickname2, player3!.Token)
             );
 
@@ -216,41 +216,41 @@ namespace ShogiServer.IntegrationTests.Hubs
             // arrange
             var nickname1 = "player1";
             Player? player1 = null;
-            connection1.On<Player>(nameof(IMatchmakingClient.SendPlayer), response =>
+            connection1.On<Player>(nameof(IShogiClient.SendPlayer), response =>
             {
                 player1 = response;
             });
             Invitation? invite = null;
-            connection1.On<Invitation>(nameof(IMatchmakingClient.SendInvitation), response =>
+            connection1.On<Invitation>(nameof(IShogiClient.SendInvitation), response =>
             {
                 invite = response;
             });
 
             await connection1.StartAsync();
-            await connection1.InvokeAsync(nameof(MatchmakingHub.JoinLobby), nickname1);
+            await connection1.InvokeAsync(nameof(ShogiHub.JoinLobby), nickname1);
 
             var nickname2 = "player2";
             Player? player2 = null;
-            connection2.On<Player>(nameof(IMatchmakingClient.SendPlayer), response =>
+            connection2.On<Player>(nameof(IShogiClient.SendPlayer), response =>
             {
                 player2 = response;
             });
             bool rejected = false;
-            connection2.On(nameof(IMatchmakingClient.SendRejection), () =>
+            connection2.On(nameof(IShogiClient.SendRejection), () =>
             {
                 rejected = true;
             });
 
             await connection2.StartAsync();
-            await connection2.InvokeAsync(nameof(MatchmakingHub.JoinLobby), nickname2);
+            await connection2.InvokeAsync(nameof(ShogiHub.JoinLobby), nickname2);
             await Task.Delay(2000);
 
-            await connection2.InvokeAsync(nameof(MatchmakingHub.Invite), new InviteRequest(nickname1, player2!.Token));
+            await connection2.InvokeAsync(nameof(ShogiHub.Invite), new InviteRequest(nickname1, player2!.Token));
             await Task.Delay(2000);
 
             // act
             await connection1.InvokeAsync(
-                nameof(MatchmakingHub.RejectInvitation), 
+                nameof(ShogiHub.RejectInvitation), 
                 new RejectInvitationRequest(invite!.Id, player1!.Token)
             );
             await Task.Delay(2000);
@@ -265,38 +265,38 @@ namespace ShogiServer.IntegrationTests.Hubs
             // arrange
             var nickname1 = "player1";
             Player? player1 = null;
-            connection1.On<Player>(nameof(IMatchmakingClient.SendPlayer), response =>
+            connection1.On<Player>(nameof(IShogiClient.SendPlayer), response =>
             {
                 player1 = response;
             });
             Invitation? invite = null;
-            connection1.On<Invitation>(nameof(IMatchmakingClient.SendInvitation), response =>
+            connection1.On<Invitation>(nameof(IShogiClient.SendInvitation), response =>
             {
                 invite = response;
             });
 
             await connection1.StartAsync();
-            await connection1.InvokeAsync(nameof(MatchmakingHub.JoinLobby), nickname1);
+            await connection1.InvokeAsync(nameof(ShogiHub.JoinLobby), nickname1);
 
             var nickname2 = "player2";
             Player? player2 = null;
-            connection2.On<Player>(nameof(IMatchmakingClient.SendPlayer), response =>
+            connection2.On<Player>(nameof(IShogiClient.SendPlayer), response =>
             {
                 player2 = response;
             });
 
             await connection2.StartAsync();
-            await connection2.InvokeAsync(nameof(MatchmakingHub.JoinLobby), nickname2);
+            await connection2.InvokeAsync(nameof(ShogiHub.JoinLobby), nickname2);
             await Task.Delay(2000);
 
-            await connection2.InvokeAsync(nameof(MatchmakingHub.Invite), new InviteRequest(nickname1, player2!.Token));
+            await connection2.InvokeAsync(nameof(ShogiHub.Invite), new InviteRequest(nickname1, player2!.Token));
             await Task.Delay(2000);
 
             var nonExistentInviteId = Guid.NewGuid();
 
             // act
             var act = async () => await connection1.InvokeAsync(
-                nameof(MatchmakingHub.RejectInvitation), 
+                nameof(ShogiHub.RejectInvitation), 
                 new RejectInvitationRequest(nonExistentInviteId, player1!.Token)
             );
             await Task.Delay(2000);
@@ -311,36 +311,36 @@ namespace ShogiServer.IntegrationTests.Hubs
             // arrange
             var nickname1 = "player1";
             Player? player1 = null;
-            connection1.On<Player>(nameof(IMatchmakingClient.SendPlayer), response =>
+            connection1.On<Player>(nameof(IShogiClient.SendPlayer), response =>
             {
                 player1 = response;
             });
             Invitation? invite = null;
-            connection1.On<Invitation>(nameof(IMatchmakingClient.SendInvitation), response =>
+            connection1.On<Invitation>(nameof(IShogiClient.SendInvitation), response =>
             {
                 invite = response;
             });
 
             await connection1.StartAsync();
-            await connection1.InvokeAsync(nameof(MatchmakingHub.JoinLobby), nickname1);
+            await connection1.InvokeAsync(nameof(ShogiHub.JoinLobby), nickname1);
 
             var nickname2 = "player2";
             Player? player2 = null;
-            connection2.On<Player>(nameof(IMatchmakingClient.SendPlayer), response =>
+            connection2.On<Player>(nameof(IShogiClient.SendPlayer), response =>
             {
                 player2 = response;
             });
 
             await connection2.StartAsync();
-            await connection2.InvokeAsync(nameof(MatchmakingHub.JoinLobby), nickname2);
+            await connection2.InvokeAsync(nameof(ShogiHub.JoinLobby), nickname2);
             await Task.Delay(2000);
 
-            await connection2.InvokeAsync(nameof(MatchmakingHub.Invite), new InviteRequest(nickname1, player2!.Token));
+            await connection2.InvokeAsync(nameof(ShogiHub.Invite), new InviteRequest(nickname1, player2!.Token));
             await Task.Delay(2000);
 
             // act
             var act = async () => await connection2.InvokeAsync(
-                nameof(MatchmakingHub.RejectInvitation), 
+                nameof(ShogiHub.RejectInvitation), 
                 new RejectInvitationRequest(invite!.Id, player2.Token)
             );
             await Task.Delay(2000);
@@ -354,43 +354,43 @@ namespace ShogiServer.IntegrationTests.Hubs
         {
             var nickname1 = "player1";
             Player? player1 = null;
-            connection1.On<Player>(nameof(IMatchmakingClient.SendPlayer), response =>
+            connection1.On<Player>(nameof(IShogiClient.SendPlayer), response =>
             {
                 player1 = response;
             });
             Invitation? invitation = null;
-            connection1.On<Invitation>(nameof(IMatchmakingClient.SendInvitation), response =>
+            connection1.On<Invitation>(nameof(IShogiClient.SendInvitation), response =>
             {
                 invitation = response;
             });
             Game? game1 = null;
-            connection1.On<Game>(nameof(IMatchmakingClient.SendCreatedGame), response =>
+            connection1.On<Game>(nameof(IShogiClient.SendCreatedGame), response =>
             {
                 game1 = response;
             });
             await connection1.StartAsync();
-            await connection1.InvokeAsync(nameof(MatchmakingHub.JoinLobby), nickname1);
+            await connection1.InvokeAsync(nameof(ShogiHub.JoinLobby), nickname1);
 
             var nickname2 = "player2";
             Player? player2 = null;
-            connection2.On<Player>(nameof(IMatchmakingClient.SendPlayer), response =>
+            connection2.On<Player>(nameof(IShogiClient.SendPlayer), response =>
             {
                 player2 = response;
             });
             Game? game2 = null;
-            connection2.On<Game>(nameof(IMatchmakingClient.SendCreatedGame), response =>
+            connection2.On<Game>(nameof(IShogiClient.SendCreatedGame), response =>
             {
                 game2 = response;
             });
             await connection2.StartAsync();
-            await connection2.InvokeAsync(nameof(MatchmakingHub.JoinLobby), nickname2);
+            await connection2.InvokeAsync(nameof(ShogiHub.JoinLobby), nickname2);
             await Task.Delay(2000);
 
-            await connection2.InvokeAsync(nameof(MatchmakingHub.Invite), new InviteRequest(nickname1, player2!.Token));
+            await connection2.InvokeAsync(nameof(ShogiHub.Invite), new InviteRequest(nickname1, player2!.Token));
             await Task.Delay(2000);
 
             await connection1.InvokeAsync(
-                nameof(MatchmakingHub.AcceptInvitation),
+                nameof(ShogiHub.AcceptInvitation),
                 new AcceptInvitationRequest(invitation!.Id, player1!.Token)
             );
             await Task.Delay(2000);
@@ -398,6 +398,63 @@ namespace ShogiServer.IntegrationTests.Hubs
             game1.Should().NotBeNull();
             game2.Should().NotBeNull();
             game1!.Id.Should().Be(game2!.Id);
+        }
+
+        [Test]
+        public async Task MakeMove_WhenGameExists_UpdatesGameState()
+        {
+            var nickname1 = "player1";
+            Player? player1 = null;
+            connection1.On<Player>(nameof(IShogiClient.SendPlayer), response =>
+            {
+                player1 = response;
+            });
+            Invitation? invitation = null;
+            connection1.On<Invitation>(nameof(IShogiClient.SendInvitation), response =>
+            {
+                invitation = response;
+            });
+            Game? game1 = null;
+            connection1.On<Game>(nameof(IShogiClient.SendCreatedGame), response =>
+            {
+                game1 = response;
+            });
+            await connection1.StartAsync();
+            await connection1.InvokeAsync(nameof(ShogiHub.JoinLobby), nickname1);
+
+            var nickname2 = "player2";
+            Player? player2 = null;
+            connection2.On<Player>(nameof(IShogiClient.SendPlayer), response =>
+            {
+                player2 = response;
+            });
+            Game? game2 = null;
+            connection2.On<Game>(nameof(IShogiClient.SendGameState), response =>
+            {
+                game2 = response;
+            });
+            await connection2.StartAsync();
+            await connection2.InvokeAsync(nameof(ShogiHub.JoinLobby), nickname2);
+            await Task.Delay(2000);
+
+            await connection2.InvokeAsync(nameof(ShogiHub.Invite), new InviteRequest(nickname1, player2!.Token));
+            await Task.Delay(2000);
+
+            await connection1.InvokeAsync(
+                nameof(ShogiHub.AcceptInvitation),
+                new AcceptInvitationRequest(invitation!.Id, player1!.Token)
+            );
+            await Task.Delay(2000);
+
+            var move = "test";
+            await connection1.InvokeAsync(
+                nameof(ShogiHub.MakeMove),
+                new MakeMoveRequest(game1!.Id, player1!.Token, move)
+            );
+            await Task.Delay(2000);
+
+            game1!.Id.Should().Be(game2!.Id);
+            game2.BoardState.Should().Be(move);
         }
     }
 }

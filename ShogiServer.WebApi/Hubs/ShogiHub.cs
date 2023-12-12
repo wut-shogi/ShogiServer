@@ -9,14 +9,15 @@ namespace ShogiServer.WebApi.Hubs
     public record RejectInvitationRequest(Guid InvitationId, string Token);
     public record CancelInvitationRequest(Guid InvitationId, string Token);
     public record AcceptInvitationRequest(Guid InvitationId, string Token);
+    public record MakeMoveRequest(Guid GameId, string Token, string Move);
 
     [SignalRHub]
-    public class MatchmakingHub : Hub<IMatchmakingClient>
+    public class ShogiHub : Hub<IShogiClient>
     {
         private readonly IRepositoryWrapper _repositories;
 
 
-        public MatchmakingHub(IRepositoryWrapper repositories)
+        public ShogiHub(IRepositoryWrapper repositories)
         {
             _repositories = repositories;
         }
@@ -52,12 +53,12 @@ namespace ShogiServer.WebApi.Hubs
             return player;
         }
 
-        private List<Player> AnonymousLobby()
+        private List<PlayerDTO> AnonymousLobby()
         {
             return _repositories
                 .Players
                 .FindAll()
-                .Select(Anonymize)
+                .Select(p => PlayerDTO.FromDatabasePlayer(p))
                 .ToList();
         }
 
@@ -107,11 +108,8 @@ namespace ShogiServer.WebApi.Hubs
                 transaction.Commit();
                 _repositories.Save();
 
-                invite.InvitedPlayer = Anonymize(invite.InvitedPlayer);
-                invite.InvitedPlayer.ReceivedInvitation = null;
-                invite.InvitingPlayer.SentInvitation = null;
-
-                await Clients.Client(invitedPlayer.ConnectionId).SendInvitation(invite);
+                await Clients.Client(invitedPlayer.ConnectionId)
+                    .SendInvitation(InvitationDTO.FromDatabaseInvitation(invite));
                 await Clients.All.SendLobby(AnonymousLobby());
             }
             catch (Exception)
@@ -163,11 +161,10 @@ namespace ShogiServer.WebApi.Hubs
                 transaction.Commit();
                 _repositories.Save();
 
-                newGame.White = null!;
-                newGame.Black = null!;
+                var gameDTO = GameDTO.FromDatabaseGame(newGame);
 
-                await Clients.Client(invitingPlayer.ConnectionId).SendCreatedGame(newGame);
-                await Clients.Client(player.ConnectionId).SendCreatedGame(newGame);
+                await Clients.Client(invitingPlayer.ConnectionId).SendCreatedGame(gameDTO);
+                await Clients.Client(player.ConnectionId).SendCreatedGame(gameDTO);
                 await Clients.All.SendLobby(AnonymousLobby());
             }
             catch (Exception)
@@ -237,6 +234,34 @@ namespace ShogiServer.WebApi.Hubs
             }
 
             await base.OnDisconnectedAsync(exception);
+        }
+
+        public async Task MakeMove(MakeMoveRequest request)
+        {
+            try
+            {
+                var game = _repositories.Games.GetById(request.GameId) ??
+                    throw new HubException("Game does not exist.");
+
+                game.BoardState = request.Move;
+                _repositories.Games.Update(game);
+                _repositories.Save();
+
+                var gameDTO = GameDTO.FromDatabaseGame(game);
+
+                var black = _repositories.Players.GetById(game.BlackId) ??
+                    throw new HubException("Black player does not exist.");
+                    
+                var white = _repositories.Players.GetById(game.WhiteId) ??
+                    throw new HubException("White player does not exist.");
+
+                await Clients.Client(black.ConnectionId).SendGameState(gameDTO);
+                await Clients.Client(white.ConnectionId).SendGameState(gameDTO);
+            }
+            catch (Exception ex)
+            {
+                throw new HubException(ex.Message);
+            }
         }
     }
 }

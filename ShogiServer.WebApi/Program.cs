@@ -61,8 +61,7 @@ namespace ShogiServer.WebApi
             app.UseAuthorization();
 
             app.MapControllers();
-            app.MapHub<MatchmakingHub>("/matchmaking");
-            app.MapHub<GameHub>("/game");
+            app.MapHub<ShogiHub>("/shogi-hub");
 
             app.Run();
         }
