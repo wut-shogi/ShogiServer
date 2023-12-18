@@ -95,10 +95,43 @@ namespace ShogiServer.WebApi.Hubs
             }
         }
 
-        private static Player Anonymize(Player player)
+        public async Task CreateGameWithComputer()
         {
-            player.Token = null!;
-            return player;
+            var newPlayer = new Player
+            {
+                Id = Guid.NewGuid(),
+                Nickname = Guid.NewGuid().ToString(),
+                ConnectionId = Context.ConnectionId,
+                Token = Guid.NewGuid().ToString(),
+                State = PlayerState.Playing,
+            };
+
+            try
+            {
+                var transaction = _repositories.BeginTransaction();
+
+                _repositories.Players.Create(newPlayer);
+
+                var newGame = new Game
+                {
+                    Id = Guid.NewGuid(),
+                    BoardState = "TODO",
+                    BlackId = newPlayer.Id,
+                    Type = GameType.PlayerVsComputer
+                };
+
+                _repositories.Games.Create(newGame);
+
+                transaction!.Commit();
+                _repositories.Save();
+
+                await Clients.Caller.SendPlayer(newPlayer);
+                await Clients.Caller.SendCreatedGame(GameDTO.FromDatabaseGame(newGame));
+            }
+            catch (Exception ex)
+            {
+                throw new HubException(ex.Message);
+            }
         }
 
         private List<PlayerDTO> AnonymousLobby()
@@ -191,7 +224,8 @@ namespace ShogiServer.WebApi.Hubs
                     Id = Guid.NewGuid(),
                     BlackId = invitingPlayer.Id,
                     WhiteId = player.Id,
-                    BoardState = "TODO"
+                    BoardState = "TODO",
+                    Type = GameType.PlayerVsPlayer,
                 };
 
                 _repositories.Games.Create(newGame);
@@ -297,10 +331,10 @@ namespace ShogiServer.WebApi.Hubs
 
                 var gameDTO = GameDTO.FromDatabaseGame(game);
 
-                var black = _repositories.Players.GetById(game.BlackId) ??
+                var black = _repositories.Players.GetById(game.BlackId!.Value) ??
                     throw new HubException("Black player does not exist.");
                     
-                var white = _repositories.Players.GetById(game.WhiteId) ??
+                var white = _repositories.Players.GetById(game.WhiteId!.Value) ??
                     throw new HubException("White player does not exist.");
 
                 await Clients.Client(black.ConnectionId).SendGameState(gameDTO);
