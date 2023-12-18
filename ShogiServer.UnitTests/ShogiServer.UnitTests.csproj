@@ -26,6 +26,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\ShogiServer.EngineWrapper\ShogiServer.EngineWrapper.csproj" />
     <ProjectReference Include="..\ShogiServer.WebApi\ShogiServer.WebApi.csproj" />
   </ItemGroup>
 

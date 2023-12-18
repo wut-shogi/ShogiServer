@@ -456,5 +456,30 @@ namespace ShogiServer.IntegrationTests.Hubs
             game1!.Id.Should().Be(game2!.Id);
             game2.BoardState.Should().Be(move);
         }
+
+        [Test]
+        public async Task CreateGameWithComputer_CreatesPlayerAndGame()
+        {
+            Player? player = null;
+            connection1.On<Player>(nameof(IShogiClient.SendPlayer), response =>
+            {
+                player = response;
+            });
+            Game? game = null;
+            connection1.On<Game>(nameof(IShogiClient.SendCreatedGame), response =>
+            {
+                game = response;
+            });
+            await connection1.StartAsync();
+
+
+            await connection1.InvokeAsync(nameof(ShogiHub.CreateGameWithComputer));
+            await Task.Delay(2000);
+
+            player.Should().NotBeNull();
+            player!.Nickname.Should().NotBeNullOrEmpty();
+            game.Should().NotBeNull();
+            game!.BlackId.Should().Be(player!.Id);
+        }
     }
 }
