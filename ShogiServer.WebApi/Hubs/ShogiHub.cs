@@ -224,7 +224,8 @@ namespace ShogiServer.WebApi.Hubs
                     Id = Guid.NewGuid(),
                     BlackId = invitingPlayer.Id,
                     WhiteId = acceptingPlayer.Id,
-                    BoardState = "TODO"
+                    BoardState = "TODO",
+                    Type = GameType.PlayerVsPlayer,
                 };
 
                 _repositories.Games.Create(newGame);
