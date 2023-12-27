@@ -16,6 +16,7 @@ namespace ShogiServer.WebApi.Hubs
             this.Token = Token;
         }
     };
+
     public record RejectInvitationRequest {
         public Guid InvitationId { get; set; }
         public string Token { get; set; }
@@ -25,6 +26,7 @@ namespace ShogiServer.WebApi.Hubs
         }
 
     }
+
     public record CancelInvitationRequest {
 
         public Guid InvitationId { get; set; }
@@ -34,6 +36,7 @@ namespace ShogiServer.WebApi.Hubs
             this.Token = Token;
         }
     };
+
     public record AcceptInvitationRequest
     {
         public Guid InvitationId { get; set; }
