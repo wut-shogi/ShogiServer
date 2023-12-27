@@ -2,14 +2,62 @@
 using ShogiServer.WebApi.Model;
 using ShogiServer.WebApi.Services;
 using SignalRSwaggerGen.Attributes;
+using System.Runtime.CompilerServices;
 
 namespace ShogiServer.WebApi.Hubs
 {
-    public record InviteRequest(string InvitedNickname, string Token);
-    public record RejectInvitationRequest(Guid InvitationId, string Token);
-    public record CancelInvitationRequest(Guid InvitationId, string Token);
-    public record AcceptInvitationRequest(Guid InvitationId, string Token);
-    public record MakeMoveRequest(Guid GameId, string Token, string Move);
+    public record InviteRequest
+    {
+        public string InvitedNickname { get; set; }
+        public string Token { get; set; }
+        public InviteRequest(string InvitedNickname, string Token)
+        {
+            this.InvitedNickname = InvitedNickname;
+            this.Token = Token;
+        }
+    };
+
+    public record RejectInvitationRequest {
+        public Guid InvitationId { get; set; }
+        public string Token { get; set; }
+        public RejectInvitationRequest(Guid InvitationId, string Token) { 
+            this.InvitationId = InvitationId;
+            this.Token = Token;
+        }
+
+    }
+
+    public record CancelInvitationRequest {
+
+        public Guid InvitationId { get; set; }
+        public string Token { get; set; }
+        public  CancelInvitationRequest(Guid InvitationId, string Token){ 
+            this.InvitationId = InvitationId;
+            this.Token = Token;
+        }
+    };
+
+    public record AcceptInvitationRequest
+    {
+        public Guid InvitationId { get; set; }
+        public string Token { get; set; }
+        public AcceptInvitationRequest(Guid InvitationId, string Token)
+        {
+            this.InvitationId = InvitationId;
+            this.Token = Token;
+        }
+
+    }
+    public record MakeMoveRequest{
+        public Guid GameId { get; set; }
+        public string Token { get; set; }
+        public string Move { get; set; }
+        public  MakeMoveRequest(Guid GameId, string Token, string Move) { 
+            this.GameId=GameId;
+            this.Token=Token;
+            this.Move=Move;
+        }
+    }
 
     [SignalRHub]
     public class ShogiHub : Hub<IShogiClient>

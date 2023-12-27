@@ -75,8 +75,8 @@ namespace ShogiServer.IntegrationTests.Hubs
         public async Task JoinLobby_UpdatesLobby()
         {
             var nickname1 = "player1";
-            List<Player>? result = null;
-            connection1.On<List<Player>>(nameof(IShogiClient.SendLobby), response =>
+            List<PlayerDTO>? result = null;
+            connection1.On<List<PlayerDTO>>(nameof(IShogiClient.SendLobby), response =>
             {
                 result = response;
             });
@@ -97,8 +97,8 @@ namespace ShogiServer.IntegrationTests.Hubs
         public async Task OnDisconnect_UpdatesLobby()
         {
             var nickname1 = "player1";
-            List<Player>? result = null;
-            connection1.On<List<Player>>(nameof(IShogiClient.SendLobby), response =>
+            List<PlayerDTO>? result = null;
+            connection1.On<List<PlayerDTO>>(nameof(IShogiClient.SendLobby), response =>
             {
                 result = response;
             });
@@ -124,8 +124,8 @@ namespace ShogiServer.IntegrationTests.Hubs
         public async Task Invite_WhenPlayersReady_SendsInvitation()
         {
             var nickname1 = "player1";
-            Invitation? result = null;
-            connection1.On<Invitation>(nameof(IShogiClient.SendInvitation), response =>
+            InvitationDTO? result = null;
+            connection1.On<InvitationDTO>(nameof(IShogiClient.SendInvitation), response =>
             {
                 result = response;
             });
@@ -220,8 +220,8 @@ namespace ShogiServer.IntegrationTests.Hubs
             {
                 player1 = response;
             });
-            Invitation? invite = null;
-            connection1.On<Invitation>(nameof(IShogiClient.SendInvitation), response =>
+            InvitationDTO? invite = null;
+            connection1.On<InvitationDTO>(nameof(IShogiClient.SendInvitation), response =>
             {
                 invite = response;
             });
@@ -269,8 +269,8 @@ namespace ShogiServer.IntegrationTests.Hubs
             {
                 player1 = response;
             });
-            Invitation? invite = null;
-            connection1.On<Invitation>(nameof(IShogiClient.SendInvitation), response =>
+            InvitationDTO? invite = null;
+            connection1.On<InvitationDTO>(nameof(IShogiClient.SendInvitation), response =>
             {
                 invite = response;
             });
@@ -315,8 +315,8 @@ namespace ShogiServer.IntegrationTests.Hubs
             {
                 player1 = response;
             });
-            Invitation? invite = null;
-            connection1.On<Invitation>(nameof(IShogiClient.SendInvitation), response =>
+            InvitationDTO? invite = null;
+            connection1.On<InvitationDTO>(nameof(IShogiClient.SendInvitation), response =>
             {
                 invite = response;
             });
@@ -358,13 +358,13 @@ namespace ShogiServer.IntegrationTests.Hubs
             {
                 player1 = response;
             });
-            Invitation? invitation = null;
-            connection1.On<Invitation>(nameof(IShogiClient.SendInvitation), response =>
+            InvitationDTO? invitation = null;
+            connection1.On<InvitationDTO>(nameof(IShogiClient.SendInvitation), response =>
             {
                 invitation = response;
             });
-            Game? game1 = null;
-            connection1.On<Game>(nameof(IShogiClient.SendCreatedGame), response =>
+            GameDTO? game1 = null;
+            connection1.On<GameDTO>(nameof(IShogiClient.SendCreatedGame), response =>
             {
                 game1 = response;
             });
@@ -377,8 +377,8 @@ namespace ShogiServer.IntegrationTests.Hubs
             {
                 player2 = response;
             });
-            Game? game2 = null;
-            connection2.On<Game>(nameof(IShogiClient.SendCreatedGame), response =>
+            GameDTO? game2 = null;
+            connection2.On<GameDTO>(nameof(IShogiClient.SendCreatedGame), response =>
             {
                 game2 = response;
             });
@@ -397,6 +397,7 @@ namespace ShogiServer.IntegrationTests.Hubs
 
             game1.Should().NotBeNull();
             game2.Should().NotBeNull();
+            game1!.Id.Should().NotBeEmpty();
             game1!.Id.Should().Be(game2!.Id);
         }
 
@@ -409,13 +410,13 @@ namespace ShogiServer.IntegrationTests.Hubs
             {
                 player1 = response;
             });
-            Invitation? invitation = null;
-            connection1.On<Invitation>(nameof(IShogiClient.SendInvitation), response =>
+            InvitationDTO? invitation = null;
+            connection1.On<InvitationDTO>(nameof(IShogiClient.SendInvitation), response =>
             {
                 invitation = response;
             });
-            Game? game1 = null;
-            connection1.On<Game>(nameof(IShogiClient.SendCreatedGame), response =>
+            GameDTO? game1 = null;
+            connection1.On<GameDTO>(nameof(IShogiClient.SendCreatedGame), response =>
             {
                 game1 = response;
             });
@@ -428,8 +429,8 @@ namespace ShogiServer.IntegrationTests.Hubs
             {
                 player2 = response;
             });
-            Game? game2 = null;
-            connection2.On<Game>(nameof(IShogiClient.SendGameState), response =>
+            GameDTO? game2 = null;
+            connection2.On<GameDTO>(nameof(IShogiClient.SendGameState), response =>
             {
                 game2 = response;
             });
