@@ -1,0 +1,3 @@
+[submodule "ShogiServer.EngineWrapper/shogi_engine"]
+	path = ShogiServer.EngineWrapper/shogi_engine
+	url = https://github.com/wut-shogi/shogi_engine.git
