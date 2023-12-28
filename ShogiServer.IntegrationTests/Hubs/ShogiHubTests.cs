@@ -399,6 +399,8 @@ namespace ShogiServer.IntegrationTests.Hubs
             game2.Should().NotBeNull();
             game1!.Id.Should().NotBeEmpty();
             game1!.Id.Should().Be(game2!.Id);
+            game1!.BlackPlayer.Nickname.Should().Be(nickname2);
+            game1!.WhitePlayer.Nickname.Should().Be(nickname1);
         }
 
         [Test]
