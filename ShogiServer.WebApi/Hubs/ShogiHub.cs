@@ -172,11 +172,11 @@ namespace ShogiServer.WebApi.Hubs
             var transaction = _repositories.BeginTransaction()!;
             try
             {
-                var player = AuthenticatedPlayer(request.Token);
+                var acceptingPlayer = AuthenticatedPlayer(request.Token);
                 var invite = _repositories.Invitations.GetById(request.InvitationId) ??
                     throw new HubException("Invitation does not exist.");
 
-                if (invite.InvitedPlayerId != player.Id)
+                if (invite.InvitedPlayerId != acceptingPlayer.Id)
                 {
                     throw new HubException("Invitation not targeted to this player.");
                 }
@@ -190,7 +190,7 @@ namespace ShogiServer.WebApi.Hubs
                 {
                     Id = Guid.NewGuid(),
                     BlackId = invitingPlayer.Id,
-                    WhiteId = player.Id,
+                    WhiteId = acceptingPlayer.Id,
                     BoardState = "TODO"
                 };
 
@@ -201,10 +201,10 @@ namespace ShogiServer.WebApi.Hubs
                 invitingPlayer.State = PlayerState.Playing;
                 _repositories.Players.Update(invitingPlayer);
 
-                player.ReceivedInvitation = null;
-                invitingPlayer.GameAsWhite = newGame;
-                player.State = PlayerState.Playing;
-                _repositories.Players.Update(player);
+                acceptingPlayer.ReceivedInvitation = null;
+                acceptingPlayer.GameAsWhite = newGame;
+                acceptingPlayer.State = PlayerState.Playing;
+                _repositories.Players.Update(acceptingPlayer);
 
                 transaction.Commit();
                 _repositories.Save();
@@ -212,7 +212,7 @@ namespace ShogiServer.WebApi.Hubs
                 var gameDTO = GameDTO.FromDatabaseGame(newGame);
 
                 await Clients.Client(invitingPlayer.ConnectionId).SendCreatedGame(gameDTO);
-                await Clients.Client(player.ConnectionId).SendCreatedGame(gameDTO);
+                await Clients.Client(acceptingPlayer.ConnectionId).SendCreatedGame(gameDTO);
                 await Clients.All.SendLobby(AnonymousLobby());
             }
             catch (Exception)
