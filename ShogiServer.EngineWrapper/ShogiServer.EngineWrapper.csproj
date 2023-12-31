@@ -7,8 +7,12 @@
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
   </PropertyGroup>
 
+  <Target Name="LinuxBuildEngine" BeforeTargets="Build" Condition="'$(OS)' == 'UNIX'">
+        <Exec Command="./build.sh"/>
+  </Target>
+
   <ItemGroup>
-    <None Update="shogi_engine.dll">
+    <None Update="shogi_engine.so">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
   </ItemGroup>

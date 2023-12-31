@@ -36,6 +36,7 @@ namespace ShogiServer.WebApi
             {
                 options.ClientTimeoutInterval = TimeSpan.FromMinutes(15);
                 options.KeepAliveInterval = TimeSpan.FromSeconds(60);
+                options.EnableDetailedErrors = true;
             });
 
             builder.Services.AddScoped<IRepositoryWrapper, RepositoryWrapper>();
