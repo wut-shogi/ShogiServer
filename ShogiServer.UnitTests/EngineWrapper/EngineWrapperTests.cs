@@ -1,9 +1,4 @@
-﻿using static ShogiServer.EngineWrapper.EngineWrapper;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
+﻿using ShogiServer.EngineWrapper;
 
 namespace ShogiServer.UnitTests.EngineWrapper
 {
@@ -14,10 +9,17 @@ namespace ShogiServer.UnitTests.EngineWrapper
         {
             for (int i = 0; i < 1000; i++)
             {
-                var initialPosition = "lnsgkgsnl/1r5b1/ppppppppp/9/9/9/PPPPPPPPP/1B5R1/LNSGKGSNL b - 1";
-                var result = GetAllMoves(initialPosition);
+                var result = Engine.GetAllMoves(Engine.InitialPosition());
                 result.Length.Should().Be(30);
             }
+        }
+
+        [Test]
+        public void IsBlackTurn_Test()
+        {
+            var position = Engine.InitialPosition();
+            var blackTurn = Engine.IsBlackTurn(position);
+            blackTurn.Should().BeTrue();
         }
     }
 }

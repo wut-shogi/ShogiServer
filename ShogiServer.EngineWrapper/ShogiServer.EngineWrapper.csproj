@@ -8,16 +8,9 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <None Update="build.ps1">
-      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
-    </None>
-    <None Update="shogi_engine.dll">
+    <None Update="shogi_engine.so">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
   </ItemGroup>
-
-  <Target Name="PreBuild" BeforeTargets="PreBuildEvent">
-    <Exec Command="PowerShell -ExecutionPolicy UnRestricted -File ./build.ps1" />
-  </Target>
 
 </Project>
