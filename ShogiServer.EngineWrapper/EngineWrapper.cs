@@ -6,33 +6,65 @@ namespace ShogiServer.EngineWrapper
 {
     public static partial class Engine
     {
-        [LibraryImport("shogi_engine")]
-        private static partial void getAllLegalMoves(byte[] input, byte[] output);
+        [DllImport("shogi_engine", CallingConvention = CallingConvention.Cdecl)]
+        private static extern bool init();
 
-        [LibraryImport("shogi_engine")]
-        private static partial void getBestMove(byte[] input, uint maxDepth, uint maxTime, byte[] output);
+        [DllImport("shogi_engine", CallingConvention = CallingConvention.Cdecl)]
+        private static extern void cleanup();
+
+        [DllImport("shogi_engine", CallingConvention = CallingConvention.Cdecl)]
+        private static extern int getAllLegalMoves(string SFENstring, byte[] output);
+
+        [DllImport("shogi_engine", CallingConvention = CallingConvention.Cdecl)]
+        private static extern int getBestMove(string SFENstring, uint maxDepth, uint maxTime, bool useGPU, byte[] output);
+
+        [DllImport("shogi_engine", CallingConvention = CallingConvention.Cdecl)]
+        private static extern int makeMove(string SFENstring, string moveString, byte[] output);
+
+
+        public static bool Init()
+        {
+            return init();
+        }
+
+        public static void CleanUp()
+        {
+            cleanup();
+        }
 
         public static string[] GetAllMoves(string SFENstring)
         {
-            var input = Encoding.ASCII.GetBytes(SFENstring).Append((byte) 0).ToArray();
+            Init();
             var outputBuffer = new byte[4096];
-            getAllLegalMoves(input, outputBuffer);
-            var output = Encoding.ASCII.GetString(outputBuffer.TakeWhile(c => c != '\0').ToArray());
-            return output.ToString().Split('|');
+            int size = getAllLegalMoves(SFENstring, outputBuffer);
+            string movesString = Encoding.UTF8.GetString(outputBuffer, 0, size);
+            CleanUp();
+            return movesString.Split('|');
         }
 
-        public static string GetBestMove(string SFENstring)
+        public static string GetBestMove(string SFENstring, uint maxDepth, uint maxTime, bool useGPU)
         {
-            var input = Encoding.ASCII.GetBytes(SFENstring);
+            Init();
             var outputBuffer = new byte[4096];
-            getBestMove(input, 1, 1, outputBuffer);
-            var output = Encoding.ASCII.GetString(outputBuffer.TakeWhile(c => c != '\0').ToArray());
-            return output;
+            int size = getBestMove(SFENstring, maxDepth, maxTime, useGPU, outputBuffer);
+            CleanUp();
+            return Encoding.UTF8.GetString(outputBuffer, 0, size);
+        }
+
+        public static string MakeMove(string SFENString, string moveString)
+        {
+            Init();
+            var outputBuffer = new byte[4096];
+            int size = makeMove(SFENString, moveString, outputBuffer);
+            CleanUp();
+            return Encoding.UTF8.GetString(outputBuffer, 0, size);
         }
 
         public static bool IsMoveValid(string SFENstring, string move)
         {
+            Init();
             var moves = GetAllMoves(SFENstring);
+            CleanUp();
             return moves.Contains(move);
         }
 
@@ -43,15 +75,9 @@ namespace ShogiServer.EngineWrapper
 
         public static bool IsBlackTurn(string SFENstring)
         {
-            var regex = new Regex("[bw] - [0-9]+$");
+            var regex = new Regex("[bw] [-lLnNgsSgGkKrRbBpP+]+ [0-9]+$");
             var tail = regex.Match(SFENstring).Value;
             return tail.Length > 0 && tail[0] == 'b';
-        }
-
-        public static string ApplyMove(string SFENstring, string move)
-        {
-            // TODO
-            return move;
         }
     }
 }
