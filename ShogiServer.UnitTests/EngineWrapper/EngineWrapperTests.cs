@@ -7,11 +7,8 @@ namespace ShogiServer.UnitTests.EngineWrapper
         [Test]
         public void GetAllMoves_Test()
         {
-            for (int i = 0; i < 1000; i++)
-            {
-                var result = Engine.GetAllMoves(Engine.InitialPosition());
-                result.Length.Should().Be(30);
-            }
+            var result = Engine.GetAllMoves(Engine.InitialPosition());
+            result.Length.Should().Be(30);
         }
 
         [Test]

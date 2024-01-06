@@ -1,5 +1,6 @@
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.AspNetCore.SignalR.Client;
+using ShogiServer.EngineWrapper;
 using ShogiServer.WebApi.Hubs;
 using ShogiServer.WebApi.Model;
 
@@ -60,7 +61,7 @@ namespace ShogiServer.IntegrationTests.Hubs.ShogiHubTests
             await Task.Delay(2000);
 
             var move = "1g1f";
-            //var boardAfterMove = "lnsgkgsnl/1r5b1/ppppppppp/9/9/P8/1PPPPPPPP/1B5R1/LNSGKGSNL w - 2"; <= TODO
+            var boardAfterMove = "lnsgkgsnl/1r5b1/ppppppppp/9/9/8P/PPPPPPPP1/1B5R1/LNSGKGSNL w -";
             await connection2.InvokeAsync(
                 nameof(ShogiHub.MakeMove),
                 new MakeMoveRequest(game2!.Id, player2!.Token, move)
@@ -68,8 +69,7 @@ namespace ShogiServer.IntegrationTests.Hubs.ShogiHubTests
             await Task.Delay(2000);
 
             game1!.Id.Should().Be(game2!.Id);
-            game1!.BoardState.Should().Be(move);
-            //game2.BoardState.Should().Be(boardAfterMove); <= TODO
+            game1.BoardState.Should().Be(boardAfterMove);
         }
 
         [Test]
@@ -207,6 +207,40 @@ namespace ShogiServer.IntegrationTests.Hubs.ShogiHubTests
             player!.Nickname.Should().NotBeNullOrEmpty();
             game.Should().NotBeNull();
             game!.BlackPlayer?.Id.Should().Be(player!.Id);
+        }
+
+        [Test]
+        public async Task MakeMove_GameWithComputer_UpdatesGameState()
+        {
+            Player? player = null;
+            connection1.On<Player>(nameof(IShogiClient.SendPlayer), response =>
+            {
+                player = response;
+            });
+            GameDTO? game = null;
+            connection1.On<GameDTO>(nameof(IShogiClient.SendCreatedGame), response =>
+            {
+                game = response;
+            });
+            connection1.On<GameDTO>(nameof(IShogiClient.SendGameState), response =>
+            {
+                game = response;
+            });
+            await connection1.StartAsync();
+
+            await connection1.InvokeAsync(nameof(ShogiHub.CreateGameWithComputer));
+            
+            await Task.Delay(2000);
+
+            var move = "1g1f";
+            await connection1.InvokeAsync(
+                nameof(ShogiHub.MakeMove),
+                new MakeMoveRequest(game!.Id, player!.Token, move)
+            );
+            await Task.Delay(2000);
+
+            game.BoardState.Should().NotBe(Engine.InitialPosition());
+            game.BoardState.Should().EndWith("b -");
         }
     }
 }

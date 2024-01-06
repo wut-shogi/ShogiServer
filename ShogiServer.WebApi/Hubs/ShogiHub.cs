@@ -369,7 +369,7 @@ namespace ShogiServer.WebApi.Hubs
                 throw new HubException("It is white's turn.");
             }
 
-            game.BoardState = Engine.ApplyMove(game.BoardState, request.Move);
+            game.BoardState = Engine.MakeMove(game.BoardState, request.Move);
             _repositories.Games.Update(game);
             _repositories.Save();
 
@@ -385,9 +385,6 @@ namespace ShogiServer.WebApi.Hubs
             var black = _repositories.Players.GetById(game.BlackId!.Value) ??
                 throw new HubException("Black player does not exist.");
 
-            var white = _repositories.Players.GetById(game.WhiteId!.Value) ??
-                throw new HubException("White player does not exist.");
-
             if (!Engine.IsMoveValid(game.BoardState, request.Move))
             {
                 throw new HubException("Invalid move.");
@@ -398,14 +395,15 @@ namespace ShogiServer.WebApi.Hubs
                 throw new HubException("It is black's turn.");
             }
 
-            if (!Engine.IsBlackTurn(game.BoardState) && player.Id != white.Id)
+            if (!Engine.IsBlackTurn(game.BoardState) && player.Id == black.Id)
             {
                 throw new HubException("It is white's turn.");
             }
 
-            game.BoardState = Engine.ApplyMove(game.BoardState, request.Move);
-            var computerMove = Engine.GetBestMove(game.BoardState);
-            game.BoardState = Engine.ApplyMove(game.BoardState, computerMove);
+            game.BoardState = Engine.MakeMove(game.BoardState, request.Move);
+            // todo move to config file
+            var computerMove = Engine.GetBestMove(game.BoardState, 4, 5000, false);
+            game.BoardState = Engine.MakeMove(game.BoardState, computerMove);
 
             _repositories.Games.Update(game);
             _repositories.Save();
