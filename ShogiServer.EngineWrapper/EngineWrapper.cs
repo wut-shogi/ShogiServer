@@ -47,5 +47,11 @@ namespace ShogiServer.EngineWrapper
             var tail = regex.Match(SFENstring).Value;
             return tail.Length > 0 && tail[0] == 'b';
         }
+
+        public static string ApplyMove(string SFENstring, string move)
+        {
+            // TODO
+            return move;
+        }
     }
 }
