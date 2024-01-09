@@ -1,8 +1,8 @@
 ﻿using Microsoft.AspNetCore.SignalR;
 using ShogiServer.WebApi.Model;
 using ShogiServer.WebApi.Services;
+using ShogiServer.EngineWrapper;
 using SignalRSwaggerGen.Attributes;
-using System.Runtime.CompilerServices;
 
 namespace ShogiServer.WebApi.Hubs
 {
@@ -17,21 +17,25 @@ namespace ShogiServer.WebApi.Hubs
         }
     };
 
-    public record RejectInvitationRequest {
+    public record RejectInvitationRequest
+    {
         public Guid InvitationId { get; set; }
         public string Token { get; set; }
-        public RejectInvitationRequest(Guid InvitationId, string Token) { 
+        public RejectInvitationRequest(Guid InvitationId, string Token)
+        {
             this.InvitationId = InvitationId;
             this.Token = Token;
         }
 
     }
 
-    public record CancelInvitationRequest {
+    public record CancelInvitationRequest
+    {
 
         public Guid InvitationId { get; set; }
         public string Token { get; set; }
-        public  CancelInvitationRequest(Guid InvitationId, string Token){ 
+        public CancelInvitationRequest(Guid InvitationId, string Token)
+        {
             this.InvitationId = InvitationId;
             this.Token = Token;
         }
@@ -48,14 +52,17 @@ namespace ShogiServer.WebApi.Hubs
         }
 
     }
-    public record MakeMoveRequest{
+
+    public record MakeMoveRequest
+    {
         public Guid GameId { get; set; }
         public string Token { get; set; }
         public string Move { get; set; }
-        public  MakeMoveRequest(Guid GameId, string Token, string Move) { 
-            this.GameId=GameId;
-            this.Token=Token;
-            this.Move=Move;
+        public MakeMoveRequest(Guid GameId, string Token, string Move)
+        {
+            this.GameId = GameId;
+            this.Token = Token;
+            this.Move = Move;
         }
     }
 
@@ -63,7 +70,6 @@ namespace ShogiServer.WebApi.Hubs
     public class ShogiHub : Hub<IShogiClient>
     {
         private readonly IRepositoryWrapper _repositories;
-
 
         public ShogiHub(IRepositoryWrapper repositories)
         {
@@ -115,7 +121,7 @@ namespace ShogiServer.WebApi.Hubs
                 var newGame = new Game
                 {
                     Id = Guid.NewGuid(),
-                    BoardState = "TODO",
+                    BoardState = Engine.InitialPosition(),
                     BlackId = newPlayer.Id,
                     Type = GameType.PlayerVsComputer
                 };
@@ -125,6 +131,7 @@ namespace ShogiServer.WebApi.Hubs
                 transaction!.Commit();
                 _repositories.Save();
 
+                newPlayer.GameAsBlack = null;
                 await Clients.Caller.SendPlayer(newPlayer);
                 await Clients.Caller.SendCreatedGame(GameDTO.FromDatabaseGame(newGame));
             }
@@ -205,11 +212,11 @@ namespace ShogiServer.WebApi.Hubs
             var transaction = _repositories.BeginTransaction()!;
             try
             {
-                var player = AuthenticatedPlayer(request.Token);
+                var acceptingPlayer = AuthenticatedPlayer(request.Token);
                 var invite = _repositories.Invitations.GetById(request.InvitationId) ??
                     throw new HubException("Invitation does not exist.");
 
-                if (invite.InvitedPlayerId != player.Id)
+                if (invite.InvitedPlayerId != acceptingPlayer.Id)
                 {
                     throw new HubException("Invitation not targeted to this player.");
                 }
@@ -223,8 +230,8 @@ namespace ShogiServer.WebApi.Hubs
                 {
                     Id = Guid.NewGuid(),
                     BlackId = invitingPlayer.Id,
-                    WhiteId = player.Id,
-                    BoardState = "TODO",
+                    WhiteId = acceptingPlayer.Id,
+                    BoardState = Engine.InitialPosition(),
                     Type = GameType.PlayerVsPlayer,
                 };
 
@@ -235,10 +242,10 @@ namespace ShogiServer.WebApi.Hubs
                 invitingPlayer.State = PlayerState.Playing;
                 _repositories.Players.Update(invitingPlayer);
 
-                player.ReceivedInvitation = null;
-                invitingPlayer.GameAsWhite = newGame;
-                player.State = PlayerState.Playing;
-                _repositories.Players.Update(player);
+                acceptingPlayer.ReceivedInvitation = null;
+                acceptingPlayer.GameAsWhite = newGame;
+                acceptingPlayer.State = PlayerState.Playing;
+                _repositories.Players.Update(acceptingPlayer);
 
                 transaction.Commit();
                 _repositories.Save();
@@ -246,7 +253,7 @@ namespace ShogiServer.WebApi.Hubs
                 var gameDTO = GameDTO.FromDatabaseGame(newGame);
 
                 await Clients.Client(invitingPlayer.ConnectionId).SendCreatedGame(gameDTO);
-                await Clients.Client(player.ConnectionId).SendCreatedGame(gameDTO);
+                await Clients.Client(acceptingPlayer.ConnectionId).SendCreatedGame(gameDTO);
                 await Clients.All.SendLobby(AnonymousLobby());
             }
             catch (Exception)
@@ -325,25 +332,85 @@ namespace ShogiServer.WebApi.Hubs
                 var game = _repositories.Games.GetById(request.GameId) ??
                     throw new HubException("Game does not exist.");
 
-                game.BoardState = request.Move;
-                _repositories.Games.Update(game);
-                _repositories.Save();
-
-                var gameDTO = GameDTO.FromDatabaseGame(game);
-
-                var black = _repositories.Players.GetById(game.BlackId!.Value) ??
-                    throw new HubException("Black player does not exist.");
-                    
-                var white = _repositories.Players.GetById(game.WhiteId!.Value) ??
-                    throw new HubException("White player does not exist.");
-
-                await Clients.Client(black.ConnectionId).SendGameState(gameDTO);
-                await Clients.Client(white.ConnectionId).SendGameState(gameDTO);
+                await (game.Type switch
+                {
+                    GameType.PlayerVsPlayer => MakeMovePlayerVsPlayer(game, request),
+                    GameType.PlayerVsComputer => MakeMovePlayerVsComputer(game, request),
+                    _ => throw new HubException("Invalid game type.")
+                });
             }
             catch (Exception ex)
             {
                 throw new HubException(ex.Message);
             }
+        }
+
+        private async Task MakeMovePlayerVsPlayer(Game game, MakeMoveRequest request)
+        {
+            var player = AuthenticatedPlayer(request.Token);
+            var black = _repositories.Players.GetById(game.BlackId!.Value) ??
+                throw new HubException("Black player does not exist.");
+
+            var white = _repositories.Players.GetById(game.WhiteId!.Value) ??
+                throw new HubException("White player does not exist.");
+
+            if (!Engine.IsMoveValid(game.BoardState, request.Move))
+            {
+                throw new HubException("Invalid move.");
+            }
+
+            if (Engine.IsBlackTurn(game.BoardState) && player.Id != black.Id)
+            {
+                throw new HubException("It is black's turn.");
+            }
+
+            if (!Engine.IsBlackTurn(game.BoardState) && player.Id != white.Id)
+            {
+                throw new HubException("It is white's turn.");
+            }
+
+            game.BoardState = Engine.MakeMove(game.BoardState, request.Move);
+            _repositories.Games.Update(game);
+            _repositories.Save();
+
+            var gameDTO = GameDTO.FromDatabaseGame(game);
+
+            await Clients.Client(black.ConnectionId).SendGameState(gameDTO);
+            await Clients.Client(white.ConnectionId).SendGameState(gameDTO);
+        }
+
+        private async Task MakeMovePlayerVsComputer(Game game, MakeMoveRequest request)
+        {
+            var player = AuthenticatedPlayer(request.Token);
+            var black = _repositories.Players.GetById(game.BlackId!.Value) ??
+                throw new HubException("Black player does not exist.");
+
+            if (!Engine.IsMoveValid(game.BoardState, request.Move))
+            {
+                throw new HubException("Invalid move.");
+            }
+
+            if (Engine.IsBlackTurn(game.BoardState) && player.Id != black.Id)
+            {
+                throw new HubException("It is black's turn.");
+            }
+
+            if (!Engine.IsBlackTurn(game.BoardState) && player.Id == black.Id)
+            {
+                throw new HubException("It is white's turn.");
+            }
+
+            game.BoardState = Engine.MakeMove(game.BoardState, request.Move);
+            // todo move to config file
+            var computerMove = Engine.GetBestMove(game.BoardState, 4, 5000, false);
+            game.BoardState = Engine.MakeMove(game.BoardState, computerMove);
+
+            _repositories.Games.Update(game);
+            _repositories.Save();
+
+            var gameDTO = GameDTO.FromDatabaseGame(game);
+
+            await Clients.Client(player.ConnectionId).SendGameState(gameDTO);
         }
     }
 }

@@ -1,123 +1,17 @@
-﻿using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.AspNetCore.SignalR;
 using Microsoft.AspNetCore.SignalR.Client;
-using Microsoft.AspNetCore.TestHost;
-using ShogiServer.WebApi;
 using ShogiServer.WebApi.Hubs;
 using ShogiServer.WebApi.Model;
+using ShogiServer.EngineWrapper;
 
-namespace ShogiServer.IntegrationTests.Hubs
+namespace ShogiServer.IntegrationTests.Hubs.ShogiHubTests
 {
-    internal class ShogiHubTests
+    internal class InviteTests : ShogiHubTests
     {
-        private WebApplicationFactory<Program> application = null!;
-        private TestServer server = null!;
-        private HubConnection connection1 = null!;
-        private HubConnection connection2 = null!;
-        private HubConnection connection3 = null!;
-
-
         [SetUp]
-        public void Setup()
+        public override void Setup()
         {
-            application = new WebApplicationFactory<Program>();
-            server = application.Server;
-
-            connection1 = new HubConnectionBuilder()
-                .WithUrl(
-                    "http://localhost/shogi-hub",
-                    o => o.HttpMessageHandlerFactory = _ => server.CreateHandler())
-                .WithAutomaticReconnect()
-                .Build();
-
-            connection2 = new HubConnectionBuilder()
-                .WithUrl(
-                    "http://localhost/shogi-hub",
-                    o => o.HttpMessageHandlerFactory = _ => server.CreateHandler())
-                .WithAutomaticReconnect()
-                .Build();
-
-            connection3 = new HubConnectionBuilder()
-                .WithUrl(
-                    "http://localhost/shogi-hub",
-                    o => o.HttpMessageHandlerFactory = _ => server.CreateHandler())
-                .WithAutomaticReconnect()
-                .Build();
-        }
-
-        [Test]
-        public async Task CanConnect()
-        {
-            await connection1.StartAsync();
-            connection1.State.Should().Be(HubConnectionState.Connected);
-        }
-
-        [Test]
-        public async Task JoinLobby_CreatesPlayer()
-        {
-            var nickname = "player1";
-            Player? result = null;
-            connection1.On<Player>(nameof(IShogiClient.SendPlayer), response =>
-            {
-                result = response;
-            });
-            await connection1.StartAsync();
-
-            await connection1.InvokeAsync(nameof(ShogiHub.JoinLobby), nickname);
-
-            await Task.Delay(2000);
-            result.Should().NotBeNull();
-            result?.Nickname.Should().Be(nickname);
-            result?.Token.Should().NotBeNullOrEmpty();
-        }
-
-        [Test]
-        public async Task JoinLobby_UpdatesLobby()
-        {
-            var nickname1 = "player1";
-            List<PlayerDTO>? result = null;
-            connection1.On<List<PlayerDTO>>(nameof(IShogiClient.SendLobby), response =>
-            {
-                result = response;
-            });
-
-            await connection1.StartAsync();
-            await connection1.InvokeAsync(nameof(ShogiHub.JoinLobby), nickname1);
-
-            var nickname2 = "player2";
-            await connection2.StartAsync();
-            await connection2.InvokeAsync(nameof(ShogiHub.JoinLobby), nickname2);
-
-            await Task.Delay(2000);
-            result.Should().NotBeNull();
-            result?.Count.Should().Be(2);
-        }
-
-        [Test]
-        public async Task OnDisconnect_UpdatesLobby()
-        {
-            var nickname1 = "player1";
-            List<PlayerDTO>? result = null;
-            connection1.On<List<PlayerDTO>>(nameof(IShogiClient.SendLobby), response =>
-            {
-                result = response;
-            });
-
-            await connection1.StartAsync();
-            await connection1.InvokeAsync(nameof(ShogiHub.JoinLobby), nickname1);
-
-            var nickname2 = "player2";
-            await connection2.StartAsync();
-            await connection2.InvokeAsync(nameof(ShogiHub.JoinLobby), nickname2);
-
-            await connection2.StopAsync();
-            await connection2.DisposeAsync();
-
-            connection2.State.Should().Be(HubConnectionState.Disconnected);
-
-            await Task.Delay(2000);
-            result.Should().NotBeNull();
-            result?.Count.Should().Be(1);
+            base.Setup();
         }
 
         [Test]
@@ -399,88 +293,9 @@ namespace ShogiServer.IntegrationTests.Hubs
             game2.Should().NotBeNull();
             game1!.Id.Should().NotBeEmpty();
             game1!.Id.Should().Be(game2!.Id);
-        }
-
-        [Test]
-        public async Task MakeMove_WhenGameExists_UpdatesGameState()
-        {
-            var nickname1 = "player1";
-            Player? player1 = null;
-            connection1.On<Player>(nameof(IShogiClient.SendPlayer), response =>
-            {
-                player1 = response;
-            });
-            InvitationDTO? invitation = null;
-            connection1.On<InvitationDTO>(nameof(IShogiClient.SendInvitation), response =>
-            {
-                invitation = response;
-            });
-            GameDTO? game1 = null;
-            connection1.On<GameDTO>(nameof(IShogiClient.SendCreatedGame), response =>
-            {
-                game1 = response;
-            });
-            await connection1.StartAsync();
-            await connection1.InvokeAsync(nameof(ShogiHub.JoinLobby), nickname1);
-
-            var nickname2 = "player2";
-            Player? player2 = null;
-            connection2.On<Player>(nameof(IShogiClient.SendPlayer), response =>
-            {
-                player2 = response;
-            });
-            GameDTO? game2 = null;
-            connection2.On<GameDTO>(nameof(IShogiClient.SendGameState), response =>
-            {
-                game2 = response;
-            });
-            await connection2.StartAsync();
-            await connection2.InvokeAsync(nameof(ShogiHub.JoinLobby), nickname2);
-            await Task.Delay(2000);
-
-            await connection2.InvokeAsync(nameof(ShogiHub.Invite), new InviteRequest(nickname1, player2!.Token));
-            await Task.Delay(2000);
-
-            await connection1.InvokeAsync(
-                nameof(ShogiHub.AcceptInvitation),
-                new AcceptInvitationRequest(invitation!.Id, player1!.Token)
-            );
-            await Task.Delay(2000);
-
-            var move = "test";
-            await connection1.InvokeAsync(
-                nameof(ShogiHub.MakeMove),
-                new MakeMoveRequest(game1!.Id, player1!.Token, move)
-            );
-            await Task.Delay(2000);
-
-            game1!.Id.Should().Be(game2!.Id);
-            game2.BoardState.Should().Be(move);
-        }
-
-        [Test]
-        public async Task CreateGameWithComputer_CreatesPlayerAndGame()
-        {
-            Player? player = null;
-            connection1.On<Player>(nameof(IShogiClient.SendPlayer), response =>
-            {
-                player = response;
-            });
-            Game? game = null;
-            connection1.On<Game>(nameof(IShogiClient.SendCreatedGame), response =>
-            {
-                game = response;
-            });
-            await connection1.StartAsync();
-
-
-            await connection1.InvokeAsync(nameof(ShogiHub.CreateGameWithComputer));
-            await Task.Delay(2000);
-
-            player.Should().NotBeNull();
-            player!.Nickname.Should().NotBeNullOrEmpty();
-            game.Should().NotBeNull();
-            game!.BlackId.Should().Be(player!.Id);
+            game1!.BlackPlayer!.Nickname.Should().Be(nickname2);
+            game1!.WhitePlayer!.Nickname.Should().Be(nickname1);
+            game1!.BoardState.Should().Be(Engine.InitialPosition());
         }
     }
 }

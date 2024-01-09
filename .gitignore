@@ -361,3 +361,7 @@ MigrationBackup/
 
 # Fody - auto-generated XML schema
 FodyWeavers.xsd
+
+# Shogi engine shared library
+shogi_engine.so
+shogi_engine.dll
