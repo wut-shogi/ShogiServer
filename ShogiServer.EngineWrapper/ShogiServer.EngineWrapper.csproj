@@ -5,10 +5,22 @@
     <ImplicitUsings>enable</ImplicitUsings>
     <Nullable>enable</Nullable>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
+    <Configurations>Debug;Release - CPU;Release - GPU</Configurations>
   </PropertyGroup>
+
+  <Target Name="LinuxBuildEngine" BeforeTargets="PreBuildEvent" Condition="'$(OS)' == 'UNIX'">
+    <Exec Command="./build.sh" />
+  </Target>
+
+  <Target Name="WindowsBuildEngine" BeforeTargets="PreBuildEvent" Condition="'$(OS)' == 'Windows_NT'">
+    <Exec Command="PowerShell -ExecutionPolicy UnRestricted -File ./build.ps1" />
+  </Target>
 
   <ItemGroup>
     <None Update="shogi_engine.so">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </None>
+    <None Update="shogi_engine.dll">
       <CopyToOutputDirectory>Always</CopyToOutputDirectory>
     </None>
   </ItemGroup>

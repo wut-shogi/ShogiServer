@@ -3,6 +3,7 @@ using ShogiServer.WebApi.Model;
 using ShogiServer.WebApi.Services;
 using ShogiServer.EngineWrapper;
 using SignalRSwaggerGen.Attributes;
+using System.ComponentModel;
 
 namespace ShogiServer.WebApi.Hubs
 {
@@ -305,24 +306,55 @@ namespace ShogiServer.WebApi.Hubs
 
         public override async Task OnDisconnectedAsync(Exception? exception)
         {
-            // TODO - delete invitation
-            try
-            {
-                var player = _repositories
-                    .Players
-                    .FindByCondition(p => p.ConnectionId == Context.ConnectionId)
-                    .First();
-                _repositories.Players.Delete(player);
-                _repositories.Save();
-
-                await Clients.All.SendLobby(AnonymousLobby());
-            }
-            catch (Exception ex)
-            {
-                throw new HubException(ex.Message);
-            }
-
             await base.OnDisconnectedAsync(exception);
+            // TODO - delete invitation
+            var tr = _repositories.BeginTransaction()!;
+
+            var player = _repositories
+                .Players
+                .FindByCondition(p => p.ConnectionId == Context.ConnectionId)
+                .First();
+
+            switch (player.State)
+            {
+                case PlayerState.Ready:
+                    break;
+                case PlayerState.Inviting:
+                    {
+                        var invite = player.SentInvitation ?? player.ReceivedInvitation;
+                        if (invite == null) break;
+
+                        var otherPlayerId = invite.InvitingPlayerId == player.Id
+                            ? invite.InvitedPlayerId
+                            : invite.InvitingPlayerId;
+                        var otherPlayer = _repositories.Players.GetById(otherPlayerId);
+                        if (otherPlayer == null) break;
+
+                        await Clients.Client(otherPlayer.ConnectionId).SendRejection();
+                        break;
+                    }
+                case PlayerState.Playing:
+                    {
+                        var game = player.GameAsBlack ?? player.GameAsBlack;
+                        if (game == null) break;
+
+                        var otherPlayerId = game.BlackId == player.Id
+                            ? game.WhiteId
+                            : game.BlackId;
+                        var otherPlayer = _repositories.Players.GetById(otherPlayerId!.Value);
+                        if (otherPlayer == null) break;
+
+                        await Clients.Client(otherPlayer.ConnectionId).SendRejection();
+                        break;
+                    }
+            }
+
+            _repositories.Players.Delete(player);
+
+            tr.Commit();
+            _repositories.Save();
+
+            await Clients.All.SendLobby(AnonymousLobby());
         }
 
         public async Task MakeMove(MakeMoveRequest request)
@@ -370,13 +402,30 @@ namespace ShogiServer.WebApi.Hubs
             }
 
             game.BoardState = Engine.MakeMove(game.BoardState, request.Move);
-            _repositories.Games.Update(game);
-            _repositories.Save();
 
-            var gameDTO = GameDTO.FromDatabaseGame(game);
+            if (Engine.IsMate(game.BoardState))
+            {
+                var resolution = new GameResolutionDTO
+                {
+                    Winner = player.Id == black.Id ? "b" : "w"
+                };
 
-            await Clients.Client(black.ConnectionId).SendGameState(gameDTO);
-            await Clients.Client(white.ConnectionId).SendGameState(gameDTO);
+                _repositories.Games.Delete(game);
+                _repositories.Save();
+
+                await Clients.Client(black.ConnectionId).SendGameResolution(resolution);
+                await Clients.Client(white.ConnectionId).SendGameResolution(resolution);
+            }
+            else
+            {
+                _repositories.Games.Update(game);
+                _repositories.Save();
+
+                var gameDTO = GameDTO.FromDatabaseGame(game);
+
+                await Clients.Client(black.ConnectionId).SendGameState(gameDTO);
+                await Clients.Client(white.ConnectionId).SendGameState(gameDTO);
+            }
         }
 
         private async Task MakeMovePlayerVsComputer(Game game, MakeMoveRequest request)
@@ -384,6 +433,19 @@ namespace ShogiServer.WebApi.Hubs
             var player = AuthenticatedPlayer(request.Token);
             var black = _repositories.Players.GetById(game.BlackId!.Value) ??
                 throw new HubException("Black player does not exist.");
+
+            if (Engine.IsMate(game.BoardState))
+            {
+                var resolution = new GameResolutionDTO
+                {
+                    Winner = "b"
+                };
+
+                _repositories.Games.Delete(game);
+                _repositories.Save();
+
+                await Clients.Client(black.ConnectionId).SendGameResolution(resolution);
+            }
 
             if (!Engine.IsMoveValid(game.BoardState, request.Move))
             {
@@ -402,15 +464,30 @@ namespace ShogiServer.WebApi.Hubs
 
             game.BoardState = Engine.MakeMove(game.BoardState, request.Move);
             // todo move to config file
-            var computerMove = Engine.GetBestMove(game.BoardState, 4, 5000, false);
+            var computerMove = Engine.GetBestMove(game.BoardState, 8, 5000, true);
             game.BoardState = Engine.MakeMove(game.BoardState, computerMove);
 
-            _repositories.Games.Update(game);
-            _repositories.Save();
+            if (Engine.IsMate(game.BoardState))
+            {
+                var resolution = new GameResolutionDTO
+                {
+                    Winner = "w"
+                };
 
-            var gameDTO = GameDTO.FromDatabaseGame(game);
+                _repositories.Games.Delete(game);
+                _repositories.Save();
 
-            await Clients.Client(player.ConnectionId).SendGameState(gameDTO);
+                await Clients.Client(black.ConnectionId).SendGameResolution(resolution);
+            }
+            else
+            {
+                _repositories.Games.Update(game);
+                _repositories.Save();
+
+                var gameDTO = GameDTO.FromDatabaseGame(game);
+
+                await Clients.Client(player.ConnectionId).SendGameState(gameDTO);
+            }
         }
     }
 }
