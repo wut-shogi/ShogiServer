@@ -79,5 +79,11 @@ namespace ShogiServer.EngineWrapper
             var tail = regex.Match(SFENstring).Value;
             return tail.Length > 0 && tail[0] == 'b';
         }
+
+        public static bool IsMate(string SFENstring)
+        {
+            var moves = GetAllMoves(SFENstring);
+            return moves.Length == 0;
+        }
     }
 }

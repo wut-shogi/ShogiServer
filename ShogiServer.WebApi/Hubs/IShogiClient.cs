@@ -12,6 +12,7 @@ namespace ShogiServer.WebApi.Hubs
         Task SendRejection();
         Task SendCreatedGame(GameDTO game);
         Task SendGameState(GameDTO game);
+        Task SendGameResolution(GameResolutionDTO gameResoultion);
     }
 
     public class PlayerDTO
@@ -65,5 +66,10 @@ namespace ShogiServer.WebApi.Hubs
                 BoardState = game.BoardState
             };
         }
+    }
+
+    public class GameResolutionDTO
+    {
+        public string Winner { get; set; } = null!;
     }
 }
