@@ -12,6 +12,7 @@ namespace ShogiServer.WebApi.Hubs
         Task SendRejection();
         Task SendCreatedGame(GameDTO game);
         Task SendGameState(GameDTO game);
+        Task SendGameResolution(GameResolutionDTO gameResoultion);
     }
 
     public class PlayerDTO
@@ -51,8 +52,8 @@ namespace ShogiServer.WebApi.Hubs
     public class GameDTO
     {
         public Guid Id { get; set; }
-        public PlayerDTO BlackPlayer { get; set; } = null!;
-        public PlayerDTO WhitePlayer { get; set; } = null!;
+        public PlayerDTO? BlackPlayer { get; set; } = null!;
+        public PlayerDTO? WhitePlayer { get; set; } = null!;
         public string BoardState { get; set; } = null!;
 
         public static GameDTO FromDatabaseGame(Game game)
@@ -60,10 +61,15 @@ namespace ShogiServer.WebApi.Hubs
             return new GameDTO
             {
                 Id = game.Id,
-                BlackPlayer = PlayerDTO.FromDatabasePlayer(game.Black),
-                WhitePlayer = PlayerDTO.FromDatabasePlayer(game.White),
+                BlackPlayer = game.Black != null ? PlayerDTO.FromDatabasePlayer(game.Black!) : null,
+                WhitePlayer = game.White != null ? PlayerDTO.FromDatabasePlayer(game.White!) : null,
                 BoardState = game.BoardState
             };
         }
+    }
+
+    public class GameResolutionDTO
+    {
+        public string Winner { get; set; } = null!;
     }
 }

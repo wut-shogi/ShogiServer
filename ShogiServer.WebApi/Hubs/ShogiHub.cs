@@ -1,8 +1,9 @@
 ﻿using Microsoft.AspNetCore.SignalR;
 using ShogiServer.WebApi.Model;
 using ShogiServer.WebApi.Services;
+using ShogiServer.EngineWrapper;
 using SignalRSwaggerGen.Attributes;
-using System.Runtime.CompilerServices;
+using System.ComponentModel;
 
 namespace ShogiServer.WebApi.Hubs
 {
@@ -17,21 +18,25 @@ namespace ShogiServer.WebApi.Hubs
         }
     };
 
-    public record RejectInvitationRequest {
+    public record RejectInvitationRequest
+    {
         public Guid InvitationId { get; set; }
         public string Token { get; set; }
-        public RejectInvitationRequest(Guid InvitationId, string Token) { 
+        public RejectInvitationRequest(Guid InvitationId, string Token)
+        {
             this.InvitationId = InvitationId;
             this.Token = Token;
         }
 
     }
 
-    public record CancelInvitationRequest {
+    public record CancelInvitationRequest
+    {
 
         public Guid InvitationId { get; set; }
         public string Token { get; set; }
-        public  CancelInvitationRequest(Guid InvitationId, string Token){ 
+        public CancelInvitationRequest(Guid InvitationId, string Token)
+        {
             this.InvitationId = InvitationId;
             this.Token = Token;
         }
@@ -48,14 +53,17 @@ namespace ShogiServer.WebApi.Hubs
         }
 
     }
-    public record MakeMoveRequest{
+
+    public record MakeMoveRequest
+    {
         public Guid GameId { get; set; }
         public string Token { get; set; }
         public string Move { get; set; }
-        public  MakeMoveRequest(Guid GameId, string Token, string Move) { 
-            this.GameId=GameId;
-            this.Token=Token;
-            this.Move=Move;
+        public MakeMoveRequest(Guid GameId, string Token, string Move)
+        {
+            this.GameId = GameId;
+            this.Token = Token;
+            this.Move = Move;
         }
     }
 
@@ -63,7 +71,6 @@ namespace ShogiServer.WebApi.Hubs
     public class ShogiHub : Hub<IShogiClient>
     {
         private readonly IRepositoryWrapper _repositories;
-
 
         public ShogiHub(IRepositoryWrapper repositories)
         {
@@ -95,10 +102,44 @@ namespace ShogiServer.WebApi.Hubs
             }
         }
 
-        private static Player Anonymize(Player player)
+        public async Task CreateGameWithComputer()
         {
-            player.Token = null!;
-            return player;
+            var newPlayer = new Player
+            {
+                Id = Guid.NewGuid(),
+                Nickname = Guid.NewGuid().ToString(),
+                ConnectionId = Context.ConnectionId,
+                Token = Guid.NewGuid().ToString(),
+                State = PlayerState.Playing,
+            };
+
+            try
+            {
+                var transaction = _repositories.BeginTransaction();
+
+                _repositories.Players.Create(newPlayer);
+
+                var newGame = new Game
+                {
+                    Id = Guid.NewGuid(),
+                    BoardState = Engine.InitialPosition(),
+                    BlackId = newPlayer.Id,
+                    Type = GameType.PlayerVsComputer
+                };
+
+                _repositories.Games.Create(newGame);
+
+                transaction!.Commit();
+                _repositories.Save();
+
+                newPlayer.GameAsBlack = null;
+                await Clients.Caller.SendPlayer(newPlayer);
+                await Clients.Caller.SendCreatedGame(GameDTO.FromDatabaseGame(newGame));
+            }
+            catch (Exception ex)
+            {
+                throw new HubException(ex.Message);
+            }
         }
 
         private List<PlayerDTO> AnonymousLobby()
@@ -191,7 +232,8 @@ namespace ShogiServer.WebApi.Hubs
                     Id = Guid.NewGuid(),
                     BlackId = invitingPlayer.Id,
                     WhiteId = acceptingPlayer.Id,
-                    BoardState = "TODO"
+                    BoardState = Engine.InitialPosition(),
+                    Type = GameType.PlayerVsPlayer,
                 };
 
                 _repositories.Games.Create(newGame);
@@ -264,24 +306,55 @@ namespace ShogiServer.WebApi.Hubs
 
         public override async Task OnDisconnectedAsync(Exception? exception)
         {
-            // TODO - delete invitation
-            try
-            {
-                var player = _repositories
-                    .Players
-                    .FindByCondition(p => p.ConnectionId == Context.ConnectionId)
-                    .First();
-                _repositories.Players.Delete(player);
-                _repositories.Save();
-
-                await Clients.All.SendLobby(AnonymousLobby());
-            }
-            catch (Exception ex)
-            {
-                throw new HubException(ex.Message);
-            }
-
             await base.OnDisconnectedAsync(exception);
+            // TODO - delete invitation
+            var tr = _repositories.BeginTransaction()!;
+
+            var player = _repositories
+                .Players
+                .FindByCondition(p => p.ConnectionId == Context.ConnectionId)
+                .First();
+
+            switch (player.State)
+            {
+                case PlayerState.Ready:
+                    break;
+                case PlayerState.Inviting:
+                    {
+                        var invite = player.SentInvitation ?? player.ReceivedInvitation;
+                        if (invite == null) break;
+
+                        var otherPlayerId = invite.InvitingPlayerId == player.Id
+                            ? invite.InvitedPlayerId
+                            : invite.InvitingPlayerId;
+                        var otherPlayer = _repositories.Players.GetById(otherPlayerId);
+                        if (otherPlayer == null) break;
+
+                        await Clients.Client(otherPlayer.ConnectionId).SendRejection();
+                        break;
+                    }
+                case PlayerState.Playing:
+                    {
+                        var game = player.GameAsBlack ?? player.GameAsBlack;
+                        if (game == null) break;
+
+                        var otherPlayerId = game.BlackId == player.Id
+                            ? game.WhiteId
+                            : game.BlackId;
+                        var otherPlayer = _repositories.Players.GetById(otherPlayerId!.Value);
+                        if (otherPlayer == null) break;
+
+                        await Clients.Client(otherPlayer.ConnectionId).SendRejection();
+                        break;
+                    }
+            }
+
+            _repositories.Players.Delete(player);
+
+            tr.Commit();
+            _repositories.Save();
+
+            await Clients.All.SendLobby(AnonymousLobby());
         }
 
         public async Task MakeMove(MakeMoveRequest request)
@@ -291,24 +364,129 @@ namespace ShogiServer.WebApi.Hubs
                 var game = _repositories.Games.GetById(request.GameId) ??
                     throw new HubException("Game does not exist.");
 
-                game.BoardState = request.Move;
+                await (game.Type switch
+                {
+                    GameType.PlayerVsPlayer => MakeMovePlayerVsPlayer(game, request),
+                    GameType.PlayerVsComputer => MakeMovePlayerVsComputer(game, request),
+                    _ => throw new HubException("Invalid game type.")
+                });
+            }
+            catch (Exception ex)
+            {
+                throw new HubException(ex.Message);
+            }
+        }
+
+        private async Task MakeMovePlayerVsPlayer(Game game, MakeMoveRequest request)
+        {
+            var player = AuthenticatedPlayer(request.Token);
+            var black = _repositories.Players.GetById(game.BlackId!.Value) ??
+                throw new HubException("Black player does not exist.");
+
+            var white = _repositories.Players.GetById(game.WhiteId!.Value) ??
+                throw new HubException("White player does not exist.");
+
+            if (!Engine.IsMoveValid(game.BoardState, request.Move))
+            {
+                throw new HubException("Invalid move.");
+            }
+
+            if (Engine.IsBlackTurn(game.BoardState) && player.Id != black.Id)
+            {
+                throw new HubException("It is black's turn.");
+            }
+
+            if (!Engine.IsBlackTurn(game.BoardState) && player.Id != white.Id)
+            {
+                throw new HubException("It is white's turn.");
+            }
+
+            game.BoardState = Engine.MakeMove(game.BoardState, request.Move);
+
+            if (Engine.IsMate(game.BoardState))
+            {
+                var resolution = new GameResolutionDTO
+                {
+                    Winner = player.Id == black.Id ? "b" : "w"
+                };
+
+                _repositories.Games.Delete(game);
+                _repositories.Save();
+
+                await Clients.Client(black.ConnectionId).SendGameResolution(resolution);
+                await Clients.Client(white.ConnectionId).SendGameResolution(resolution);
+            }
+            else
+            {
                 _repositories.Games.Update(game);
                 _repositories.Save();
 
                 var gameDTO = GameDTO.FromDatabaseGame(game);
 
-                var black = _repositories.Players.GetById(game.BlackId) ??
-                    throw new HubException("Black player does not exist.");
-                    
-                var white = _repositories.Players.GetById(game.WhiteId) ??
-                    throw new HubException("White player does not exist.");
-
                 await Clients.Client(black.ConnectionId).SendGameState(gameDTO);
                 await Clients.Client(white.ConnectionId).SendGameState(gameDTO);
             }
-            catch (Exception ex)
+        }
+
+        private async Task MakeMovePlayerVsComputer(Game game, MakeMoveRequest request)
+        {
+            var player = AuthenticatedPlayer(request.Token);
+            var black = _repositories.Players.GetById(game.BlackId!.Value) ??
+                throw new HubException("Black player does not exist.");
+
+            if (Engine.IsMate(game.BoardState))
             {
-                throw new HubException(ex.Message);
+                var resolution = new GameResolutionDTO
+                {
+                    Winner = "b"
+                };
+
+                _repositories.Games.Delete(game);
+                _repositories.Save();
+
+                await Clients.Client(black.ConnectionId).SendGameResolution(resolution);
+            }
+
+            if (!Engine.IsMoveValid(game.BoardState, request.Move))
+            {
+                throw new HubException("Invalid move.");
+            }
+
+            if (Engine.IsBlackTurn(game.BoardState) && player.Id != black.Id)
+            {
+                throw new HubException("It is black's turn.");
+            }
+
+            if (!Engine.IsBlackTurn(game.BoardState) && player.Id == black.Id)
+            {
+                throw new HubException("It is white's turn.");
+            }
+
+            game.BoardState = Engine.MakeMove(game.BoardState, request.Move);
+            // todo move to config file
+            var computerMove = Engine.GetBestMove(game.BoardState, 8, 5000, true);
+            game.BoardState = Engine.MakeMove(game.BoardState, computerMove);
+
+            if (Engine.IsMate(game.BoardState))
+            {
+                var resolution = new GameResolutionDTO
+                {
+                    Winner = "w"
+                };
+
+                _repositories.Games.Delete(game);
+                _repositories.Save();
+
+                await Clients.Client(black.ConnectionId).SendGameResolution(resolution);
+            }
+            else
+            {
+                _repositories.Games.Update(game);
+                _repositories.Save();
+
+                var gameDTO = GameDTO.FromDatabaseGame(game);
+
+                await Clients.Client(player.ConnectionId).SendGameState(gameDTO);
             }
         }
     }

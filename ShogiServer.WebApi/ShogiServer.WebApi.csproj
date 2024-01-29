@@ -14,4 +14,7 @@
     <PackageReference Include="Microsoft.EntityFrameworkCore" Version="7.0.14" />
   </ItemGroup>
 
+  <ItemGroup>
+    <ProjectReference Include="..\ShogiServer.EngineWrapper\ShogiServer.EngineWrapper.csproj" />
+  </ItemGroup>
 </Project>
