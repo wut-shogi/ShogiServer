@@ -147,6 +147,7 @@ namespace ShogiServer.WebApi.Hubs
             return _repositories
                 .Players
                 .FindAll()
+                .Where(p => p.State == PlayerState.Ready)
                 .Select(p => PlayerDTO.FromDatabasePlayer(p))
                 .ToList();
         }
