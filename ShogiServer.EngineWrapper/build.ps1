@@ -10,7 +10,7 @@ cd ./build
 
 echo "Executing build task"
 cmake ..
-cmake --build .
+cmake --build -DSHOGI_CUDA_SUPPORT=OFF .
 
 echo "Copying output library"
 cp ./core/Debug/shogi_engine.dll ../../shogi_engine.dll

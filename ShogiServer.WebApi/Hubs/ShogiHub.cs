@@ -463,7 +463,6 @@ namespace ShogiServer.WebApi.Hubs
             }
 
             game.BoardState = Engine.MakeMove(game.BoardState, request.Move);
-            // todo move to config file
             var computerMove = Engine.GetBestMove(game.BoardState, 8, 5000, true);
             game.BoardState = Engine.MakeMove(game.BoardState, computerMove);
 
