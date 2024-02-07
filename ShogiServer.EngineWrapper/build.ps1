@@ -9,8 +9,8 @@ if (Test-Path ./build) {
 cd ./build
 
 echo "Executing build task"
-cmake ..
-cmake --build -DSHOGI_CUDA_SUPPORT=OFF .
+cmake -DSHOGI_CUDA_SUPPORT=OFF ..
+cmake --build .
 
 echo "Copying output library"
 cp ./core/Debug/shogi_engine.dll ../../shogi_engine.dll
